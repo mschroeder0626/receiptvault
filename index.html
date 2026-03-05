@@ -494,6 +494,7 @@ function addCompany() {
 
 const methodIcon = { camera:'📷', upload:'📁', email:'✉️', drag:'🖱️' };
 const methodLabel = { camera:'Camera', upload:'Upload', email:'Email-in', drag:'Drag & drop' };
+const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
 
 function switchTab(tab) {
   RV.tab = tab;
@@ -506,9 +507,10 @@ function switchTab(tab) {
 function render() {
   const el = document.getElementById('main-content');
   if (!el) return;
-  if (RV.tab === 'capture')  el.innerHTML = renderCapture();
-  if (RV.tab === 'receipts') el.innerHTML = renderReceipts();
-  if (RV.tab === 'summary')  el.innerHTML = renderSummary();
+  el.innerHTML = ''; // always clear first
+  if (RV.tab === 'capture')       el.innerHTML = renderCapture();
+  else if (RV.tab === 'receipts') el.innerHTML = renderReceipts();
+  else if (RV.tab === 'summary')  el.innerHTML = renderSummary();
 
   // Update pending badge
   const pending = activeReceipts().filter(r => r.status === 'pending').length;
@@ -573,11 +575,11 @@ function renderCapture() {
 
         <!-- METHOD BUTTONS -->
         <div class="method-grid">
-          <label class="method-btn">
-            <input type="file" accept="image/*" capture="environment" style="display:none" onchange="rvHandleFiles(this.files,'camera')">
+          <label class="method-btn" title="${isMobile ? 'Opens rear camera' : 'Camera available on mobile — opens file picker on desktop'}">
+            <input type="file" accept="image/*" ${isMobile ? 'capture="environment"' : ''} style="display:none" onchange="rvHandleFiles(this.files,'camera')">
             <div class="method-icon">📷</div>
             <span class="method-label">Camera</span>
-            <span class="method-sub">Open rear camera</span>
+            <span class="method-sub">${isMobile ? 'Open rear camera' : 'Mobile camera / browse'}</span>
           </label>
           <label class="method-btn">
             <input type="file" accept="image/*,application/pdf" multiple style="display:none" onchange="rvHandleFiles(this.files,'upload')">
@@ -670,7 +672,7 @@ function renderReceipts() {
             </td>
             <td class="hide-mobile"><span title="${methodLabel[r.method]}" class="via-icon">${methodIcon[r.method]||'📁'}</span></td>
             <td class="amount">$${r.amount.toFixed(2)}</td>
-            <td style="text-align:right;"><button onclick="rvApprove(${r.id})" style="padding:4px 10px;border-radius:5px;border:1px solid var(--blue);background:transparent;color:var(--blue);cursor:pointer;font-size:11px;font-weight:600;font-family:'DM Sans',sans-serif;">Approve</button></td>
+            <td style="text-align:right;"><button onclick="rvApprove('${r.id}')" style="padding:4px 10px;border-radius:5px;border:1px solid var(--blue);background:transparent;color:var(--blue);cursor:pointer;font-size:11px;font-weight:600;font-family:'DM Sans',sans-serif;">Approve</button></td>
           </tr>`).join('')}
         </tbody>
       </table>
@@ -801,7 +803,7 @@ function rvEditName(recId) { WEG.rvEditName(recId); }
 function rvSaveName(recId, newName) { WEG.rvSaveName(recId, newName, activeCompany().receipts); }
 
 function rvApprove(id) {
-  const r = activeReceipts().find(r => r.id === id);
+  const r = activeReceipts().find(r => String(r.id) === String(id));
   if (r) { r.status = 'synced'; render(); }
 }
 
