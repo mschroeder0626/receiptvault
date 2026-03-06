@@ -213,7 +213,31 @@
   .empty-title { font-size: 16px; font-weight: 600; color: var(--ink2); margin-bottom: 6px; }
   .empty-sub { font-size: 13px; color: var(--ink3); line-height: 1.6; }
 
-  /* ── POWERED BY ── */
+  /* ── EXPORT ── */
+  .export-bar { background: var(--paper); border: 1px solid var(--rule); border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow-sm); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .export-bar-title { font-size: 13px; font-weight: 600; color: var(--ink); flex: 1; min-width: 120px; }
+  .export-btn { padding: 9px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: 'DM Sans', sans-serif; border: none; transition: all 0.15s; white-space: nowrap; }
+  .export-btn.primary { background: var(--blue); color: #fff; box-shadow: 0 2px 8px rgba(29,111,191,0.3); }
+  .export-btn.primary:hover { background: #1a5fa8; transform: translateY(-1px); }
+  .export-btn.secondary { background: var(--paper2); color: var(--ink2); border: 1px solid var(--rule); }
+  .export-btn.secondary:hover { border-color: var(--blue); color: var(--blue); background: var(--blue-lt); }
+  .export-select-row { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ink3); }
+  .export-select-row input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--blue); cursor: pointer; }
+  .export-modal-overlay { position: fixed; inset: 0; background: rgba(15,25,35,0.5); z-index: 200; display: flex; align-items: flex-end; justify-content: center; padding: 20px; animation: fadeIn 0.2s ease; }
+  .export-modal { background: var(--paper); border-radius: 20px 20px 16px 16px; width: 100%; max-width: 500px; padding: 28px 24px 32px; box-shadow: var(--shadow-lg); animation: slideUp 0.25s cubic-bezier(0.16,1,0.3,1); }
+  @keyframes slideUp { from { opacity:0; transform:translateY(30px); } to { opacity:1; transform:translateY(0); } }
+  @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+  .export-modal-title { font-size: 18px; font-weight: 700; color: var(--ink); margin-bottom: 4px; letter-spacing: -0.02em; }
+  .export-modal-sub { font-size: 13px; color: var(--ink3); margin-bottom: 20px; line-height: 1.5; }
+  .export-field { margin-bottom: 14px; }
+  .export-label { display: block; font-size: 11px; font-weight: 600; color: var(--ink3); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 6px; }
+  .export-input { width: 100%; padding: 11px 13px; border: 1.5px solid var(--rule); border-radius: 9px; font-size: 14px; color: var(--ink); background: var(--paper2); font-family: 'DM Sans', sans-serif; outline: none; transition: border-color 0.15s; }
+  .export-input:focus { border-color: var(--blue); background: var(--paper); }
+  .export-summary { background: var(--paper2); border: 1px solid var(--rule); border-radius: 9px; padding: 12px 14px; margin-bottom: 16px; font-size: 12px; color: var(--ink3); line-height: 1.8; }
+  .export-summary strong { color: var(--ink); }
+  .export-modal-actions { display: flex; gap: 8px; }
+
+
   .powered { text-align: center; padding: 10px; font-size: 10px; color: var(--ink3); border-top: 1px solid var(--rule); flex-shrink: 0; }
   .powered a { color: var(--ink3); text-decoration: none; }
   .powered a:hover { color: var(--blue); }
@@ -642,9 +666,19 @@ function renderCapture() {
 function renderReceipts() {
   const allReceipts = activeReceipts();
   const pending = allReceipts.filter(r => r.status === 'pending');
-  const synced = allReceipts.filter(r => r.status === 'synced');
 
   return `<div class="panel-wrap">
+
+    <!-- EXPORT BAR -->
+    <div class="export-bar fade-up">
+      <div>
+        <div class="export-bar-title">📤 Export Receipts</div>
+        <div style="font-size:11px;color:var(--ink3);margin-top:2px;">Select receipts below then export as CSV + images</div>
+      </div>
+      <button class="export-btn secondary" onclick="rvSelectAll()">Select All</button>
+      <button class="export-btn primary" onclick="rvOpenExport()">Export & Send →</button>
+    </div>
+
     ${pending.length > 0 ? `
     <div class="receipt-table-wrap fade-up" style="border-color:#fde68a;">
       <div class="table-header" style="background:var(--amber-lt);">
@@ -653,6 +687,7 @@ function renderReceipts() {
       </div>
       <table>
         <thead><tr>
+          <th style="width:32px;"></th>
           <th>Vendor</th>
           <th class="hide-mobile">Via</th>
           <th class="right">Amount</th>
@@ -660,6 +695,7 @@ function renderReceipts() {
         </tr></thead>
         <tbody>
           ${pending.map(r => `<tr>
+            <td><input type="checkbox" class="rv-select" data-id="${r.id}" style="width:15px;height:15px;accent-color:var(--blue);cursor:pointer;"></td>
             <td>
               <div class="vendor-name">${r.name || formatReceiptName(r.vendor, r.date, r.amount)}</div>
               <div class="vendor-emp">${r.date} · ${r.time} · ${r.employee}</div>
@@ -675,10 +711,11 @@ function renderReceipts() {
     <div class="receipt-table-wrap fade-up">
       <div class="table-header">
         <div class="table-title">All Receipts</div>
-        <div class="table-count">${allReceipts.length} total</div>
+        <div class="table-count" id="select-count">${allReceipts.length} total</div>
       </div>
       <table>
         <thead><tr>
+          <th style="width:32px;"></th>
           <th>Vendor</th>
           <th class="hide-mobile">Category</th>
           <th class="hide-mobile">Via</th>
@@ -687,6 +724,7 @@ function renderReceipts() {
         </tr></thead>
         <tbody>
           ${allReceipts.map(r => `<tr>
+            <td><input type="checkbox" class="rv-select" data-id="${r.id}" style="width:15px;height:15px;accent-color:var(--blue);cursor:pointer;" onchange="rvUpdateSelectCount()"></td>
             <td>
               <div class="vendor-name">${r.name || formatReceiptName(r.vendor, r.date, r.amount)}</div>
               <div class="vendor-emp">${r.date} · ${r.employee}</div>
@@ -705,7 +743,7 @@ function renderReceipts() {
 // ── SUMMARY TAB ──
 function renderSummary() {
   const summaryReceipts = activeReceipts();
-  const total = receipts.reduce((s,r) => s + r.amount, 0);
+  const total = summaryReceipts.reduce((s,r) => s + r.amount, 0);
   const cats = {};
   summaryReceipts.forEach(r => { cats[r.category] = (cats[r.category]||0) + r.amount; });
   const catSorted = Object.entries(cats).sort((a,b) => b[1]-a[1]);
@@ -888,6 +926,143 @@ function rvSaveName(recId, newName) {
   const wrap = document.querySelector(`[id="name-inp-${recId}"]`)?.parentElement;
   if (wrap) wrap.innerHTML = `<div class="receipt-name-display" id="name-disp-${recId}" onclick="rvEditName('${recId}')">${trimmed}</div>`;
 }
+
+// ── EXPORT LOGIC ──
+function rvGetSelected() {
+  const checked = document.querySelectorAll('.rv-select:checked');
+  const ids = Array.from(checked).map(c => c.dataset.id);
+  return activeReceipts().filter(r => ids.includes(String(r.id)));
+}
+
+function rvSelectAll() {
+  const boxes = document.querySelectorAll('.rv-select');
+  const allChecked = Array.from(boxes).every(b => b.checked);
+  boxes.forEach(b => b.checked = !allChecked);
+  rvUpdateSelectCount();
+}
+
+function rvUpdateSelectCount() {
+  const count = document.querySelectorAll('.rv-select:checked').length;
+  const total = activeReceipts().length;
+  const el = document.getElementById('select-count');
+  if (el) el.textContent = count > 0 ? `${count} of ${total} selected` : `${total} total`;
+}
+
+function rvOpenExport() {
+  const selected = rvGetSelected();
+  const all = activeReceipts();
+  const receipts = selected.length > 0 ? selected : all;
+  if (receipts.length === 0) {
+    alert('No receipts to export. Add some receipts first.');
+    return;
+  }
+  const co = activeCompany();
+  const total = receipts.reduce((s,r) => s + (r.amount||0), 0);
+
+  const overlay = document.createElement('div');
+  overlay.className = 'export-modal-overlay';
+  overlay.id = 'export-overlay';
+  overlay.onclick = (e) => { if (e.target === overlay) rvCloseExport(); };
+  overlay.innerHTML = `
+    <div class="export-modal">
+      <div class="export-modal-title">Export & Send</div>
+      <div class="export-modal-sub">Send a CSV summary + receipt images to your bookkeeper or accountant.</div>
+
+      <div class="export-summary">
+        <strong>${co.name}</strong> · ${receipts.length} receipt${receipts.length!==1?'s':''} · <strong>$${total.toFixed(2)}</strong> total<br>
+        Includes: CSV file with all fields + copies of receipt images
+      </div>
+
+      <div class="export-field">
+        <label class="export-label">Send to email</label>
+        <input class="export-input" id="export-email" type="email" placeholder="bookkeeper@example.com" autocapitalize="none">
+      </div>
+
+      <div class="export-field">
+        <label class="export-label">Note (optional)</label>
+        <input class="export-input" id="export-note" type="text" placeholder="e.g. March receipts for review">
+      </div>
+
+      <div class="export-modal-actions">
+        <button class="export-btn secondary" style="flex:1;" onclick="rvCloseExport()">Cancel</button>
+        <button class="export-btn primary" style="flex:2;" onclick="rvDownloadCSV()">⬇ Download CSV</button>
+        <button class="export-btn primary" style="flex:2;background:var(--green);" onclick="rvSendExport()">✉ Send Email</button>
+      </div>
+      <div style="font-size:11px;color:var(--ink3);text-align:center;margin-top:12px;line-height:1.6;">
+        Download saves the CSV to your device now.<br>
+        Email send requires backend setup — coming soon.
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  setTimeout(() => document.getElementById('export-email')?.focus(), 100);
+}
+
+function rvCloseExport() {
+  document.getElementById('export-overlay')?.remove();
+}
+
+function rvDownloadCSV() {
+  const selected = rvGetSelected();
+  const receipts = selected.length > 0 ? selected : activeReceipts();
+  const co = activeCompany();
+
+  const headers = ['Receipt Name','Vendor','Date','Time','Amount','Category','Status','Method','Employee','Note'];
+  const rows = receipts.map(r => [
+    r.name || formatReceiptName(r.vendor, r.date, r.amount),
+    r.vendor || '',
+    r.date || '',
+    r.time || '',
+    (r.amount || 0).toFixed(2),
+    r.category || '',
+    r.status || '',
+    methodLabel[r.method] || r.method || '',
+    r.employee || '',
+    r.note || ''
+  ].map(v => `"${String(v).replace(/"/g,'""')}"`));
+
+  const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const dateStr = new Date().toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'2-digit'}).replace(/\//g,'-');
+  a.href = url;
+  a.download = `${co.name.replace(/\s+/g,'_')}_Receipts_${dateStr}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+
+  // Confirm download
+  const btn = document.querySelector('#export-overlay .export-btn.primary');
+  if (btn) { btn.textContent = '✓ Downloaded!'; btn.style.background = 'var(--green)'; setTimeout(() => { btn.textContent = '⬇ Download CSV'; btn.style.background = ''; }, 2500); }
+}
+
+function rvSendExport() {
+  const email = document.getElementById('export-email')?.value.trim();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    document.getElementById('export-email')?.focus();
+    document.getElementById('export-email').style.borderColor = 'var(--red)';
+    setTimeout(() => { const el = document.getElementById('export-email'); if(el) el.style.borderColor = ''; }, 1500);
+    return;
+  }
+  // For now — download CSV and open mailto as a bridge until backend is ready
+  rvDownloadCSV();
+  const selected = rvGetSelected();
+  const receipts = selected.length > 0 ? selected : activeReceipts();
+  const co = activeCompany();
+  const note = document.getElementById('export-note')?.value.trim() || '';
+  const total = receipts.reduce((s,r) => s + (r.amount||0), 0);
+  const subject = encodeURIComponent(`${co.name} Receipts — ${receipts.length} records, $${total.toFixed(2)}`);
+  const body = encodeURIComponent(
+    `Hi,\n\nPlease find attached the receipt export from ReceiptVault.\n\n` +
+    `Company: ${co.name}\nReceipts: ${receipts.length}\nTotal: $${total.toFixed(2)}\n` +
+    (note ? `\nNote: ${note}\n` : '') +
+    `\nThe CSV file has been downloaded to your device — please attach it to this email before sending.\n\n` +
+    `Receipt summary:\n` +
+    receipts.map(r => `• ${r.name || formatReceiptName(r.vendor,r.date,r.amount)} — $${(r.amount||0).toFixed(2)}`).join('\n')
+  );
+  window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
+  setTimeout(rvCloseExport, 500);
+}
+
 
 function rvApprove(id) {
   const r = activeReceipts().find(r => String(r.id) === String(id));
