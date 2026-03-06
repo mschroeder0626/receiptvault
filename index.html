@@ -401,6 +401,7 @@ function loadState() {
     if (data.companies && data.companies.length > 0) {
       RV.companies = data.companies;
       RV.activeCompanyId = data.activeCompanyId || data.companies[0].id;
+      RV.tab = 'capture'; // always start on capture tab
       return true;
     }
   } catch(e) {}
@@ -559,6 +560,10 @@ function render() {
   if (RV.tab === 'capture')       el.innerHTML = renderCapture();
   else if (RV.tab === 'receipts') el.innerHTML = renderReceipts();
   else if (RV.tab === 'summary')  el.innerHTML = renderSummary();
+  // Sync tab highlight with state
+  document.querySelectorAll('.tab').forEach((t, i) => {
+    t.classList.toggle('active', ['capture','receipts','summary'][i] === RV.tab);
+  });
 
   // Set camera capture on mobile after render
   if (RV.tab === 'capture' && isMobile) {
@@ -885,8 +890,8 @@ If a field is not readable, use null. Amount is total charged as a number.`,
             : [{ type:'image', source:{type:'base64', media_type:mediaType, data:base64} }, { type:'text', text:'Extract vendor, date, total amount, and category from this receipt.' }]
           }]
         };
-        const response = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST', headers: { 'Content-Type': 'application/json', 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' }, body: JSON.stringify(body)
+        const response = await fetch('/api/claude', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
         });
         const data = await response.json();
         const raw = data.content?.map(c => c.text || '').join('') || '';
