@@ -388,6 +388,11 @@ function activeReceipts() { return activeCompany().receipts; }
 
 // ── COMPANY SWITCHER LOGIC ──
 function initSwitcher() {
+  // Retry if DOM elements not ready yet
+  if (!document.getElementById('co-dot')) {
+    setTimeout(initSwitcher, 50);
+    return;
+  }
   updatePill();
   renderCompanyList();
   renderColorRow();
@@ -512,6 +517,12 @@ function render() {
   else if (RV.tab === 'receipts') el.innerHTML = renderReceipts();
   else if (RV.tab === 'summary')  el.innerHTML = renderSummary();
 
+  // Set camera capture on mobile after render
+  if (RV.tab === 'capture' && isMobile) {
+    const camInput = document.getElementById('camera-input');
+    if (camInput) camInput.setAttribute('capture', 'environment');
+  }
+
   // Update pending badge
   const pending = activeReceipts().filter(r => r.status === 'pending').length;
   const badge = document.getElementById('pending-badge');
@@ -575,8 +586,8 @@ function renderCapture() {
 
         <!-- METHOD BUTTONS -->
         <div class="method-grid">
-          <label class="method-btn" title="${isMobile ? 'Opens rear camera' : 'Camera available on mobile — opens file picker on desktop'}">
-            <input type="file" accept="image/*" ${isMobile ? 'capture="environment"' : ''} style="display:none" onchange="rvHandleFiles(this.files,'camera')">
+          <label class="method-btn" id="camera-btn-label" title="${isMobile ? 'Opens rear camera' : 'Camera available on mobile — opens file picker on desktop'}">
+            <input type="file" accept="image/*" id="camera-input" style="display:none" onchange="rvHandleFiles(this.files,'camera')">
             <div class="method-icon">📷</div>
             <span class="method-label">Camera</span>
             <span class="method-sub">${isMobile ? 'Open rear camera' : 'Mobile camera / browse'}</span>
