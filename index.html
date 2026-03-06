@@ -359,25 +359,8 @@ const RV = {
   activeCompanyId: 'c1',
   companies: [
     {
-      id: 'c1', name: 'Southland', color: '#1d6fbf', isDefault: true,
-      receipts: [
-        { id:1,  name:'HomeDepot 03-03-26 $234.18', date:'03-03-26', time:'9:14 AM',  vendor:'Home Depot',    amount:234.18, category:'Supplies',  employee:'Dalton Todd',    status:'synced',  method:'upload', note:'' },
-        { id:2,  name:'Chevron 03-03-26 $89.40',    date:'03-03-26', time:'11:32 AM', vendor:'Chevron',        amount:89.40,  category:'Fuel',      employee:'Shane Barfield', status:'synced',  method:'camera', note:'' },
-        { id:3,  name:'Amazon 03-02-26 $156.00',    date:'03-02-26', time:'2:05 PM',  vendor:'Amazon',         amount:156.00, category:'Parts',     employee:'Chris Irvin',   status:'synced',  method:'email',  note:'' },
-        { id:4,  name:'Lowes 03-01-26 $312.44',     date:'03-01-26', time:'8:47 AM',  vendor:'Lowes',          amount:312.44, category:'Supplies',  employee:'Amber Lee',     status:'pending', method:'upload', note:'Needs category review' },
-        { id:5,  name:'Fastenal 02-28-26 $67.22',   date:'02-28-26', time:'3:20 PM',  vendor:'Fastenal',       amount:67.22,  category:'Parts',     employee:'Dalton Todd',   status:'synced',  method:'camera', note:'' },
-        { id:6,  name:'Sunoco 02-28-26 $112.50',    date:'02-28-26', time:'4:55 PM',  vendor:'Sunoco',         amount:112.50, category:'Fuel',      employee:'Shane Barfield', status:'synced',  method:'camera', note:'' },
-        { id:7,  name:'Grainger 02-27-26 $445.00',  date:'02-27-26', time:'10:10 AM', vendor:'Grainger',       amount:445.00, category:'Equipment', employee:'Chris Irvin',   status:'synced',  method:'email',  note:'' },
-        { id:8,  name:'OfficDepot 02-26-26 $38.75', date:'02-26-26', time:'1:33 PM',  vendor:'Office Depot',   amount:38.75,  category:'Office',    employee:'Amber Lee',     status:'pending', method:'upload', note:'' },
-      ]
-    },
-    {
-      id: 'c2', name: 'BHM Farms', color: '#16a34a', isDefault: false,
-      receipts: [
-        { id:101, name:'JohnDeere 03-04-26 $1240.00',      date:'03-04-26', time:'7:30 AM',  vendor:'John Deere',     amount:1240.00, category:'Equipment', employee:'Bobby Hardwick', status:'synced',  method:'email',  note:'' },
-        { id:102, name:'SouthernStates 03-02-26 $387.50',  date:'03-02-26', time:'12:45 PM', vendor:'Southern States',amount:387.50,  category:'Supplies',  employee:'Bobby Hardwick', status:'synced',  method:'camera', note:'' },
-        { id:103, name:'FuelDepot 02-28-26 $520.00',       date:'02-28-26', time:'4:10 PM',  vendor:'Fuel Depot',     amount:520.00,  category:'Fuel',      employee:'Bobby Hardwick', status:'pending', method:'upload', note:'' },
-      ]
+      id: 'c1', name: 'My Company', color: '#1d6fbf', isDefault: true,
+      receipts: []
     }
   ]
 };
@@ -542,7 +525,7 @@ function renderCapture() {
     <div class="stats-row">
       <div class="stat-card fade-up">
         <div class="stat-label">This Month</div>
-        <div class="stat-value blue">${RV.receipts.length}</div>
+        <div class="stat-value blue">${receipts.length}</div>
         <div class="stat-sub">receipts captured</div>
       </div>
       <div class="stat-card fade-up">
@@ -639,7 +622,7 @@ function renderCapture() {
           <th class="right">Status</th>
         </tr></thead>
         <tbody>
-          ${RV.receipts.slice(0,5).map(r => `<tr>
+          ${receipts.slice(0,5).map(r => `<tr>
             <td>
               <div class="vendor-name">${r.name || formatReceiptName(r.vendor, r.date, r.amount)}</div>
               <div class="vendor-emp">${r.date} · ${r.employee}</div>
@@ -721,13 +704,13 @@ function renderReceipts() {
 
 // ── SUMMARY TAB ──
 function renderSummary() {
-  const receipts = activeReceipts();
+  const summaryReceipts = activeReceipts();
   const total = receipts.reduce((s,r) => s + r.amount, 0);
   const cats = {};
-  RV.receipts.forEach(r => { cats[r.category] = (cats[r.category]||0) + r.amount; });
+  summaryReceipts.forEach(r => { cats[r.category] = (cats[r.category]||0) + r.amount; });
   const catSorted = Object.entries(cats).sort((a,b) => b[1]-a[1]);
   const methods = {};
-  RV.receipts.forEach(r => { methods[r.method] = (methods[r.method]||0) + 1; });
+  summaryReceipts.forEach(r => { methods[r.method] = (methods[r.method]||0) + 1; });
 
   return `<div class="panel-wrap">
     <div class="receipt-table-wrap fade-up">
@@ -796,22 +779,115 @@ function copyEmail() {
 }
 
 // ── RECEIPT AI EXTRACTION ──
-function formatReceiptName(vendor, date, amount) { return WEG.formatReceiptName(vendor, date, amount); }
+function formatReceiptName(vendor, date, amount) {
+  const v = (vendor || 'Unknown').replace(/\s+/g, '');
+  const d = date || new Date().toLocaleDateString('en-US', { month:'2-digit', day:'2-digit', year:'2-digit' }).replace(/\//g, '-');
+  const a = amount != null ? '$' + parseFloat(amount).toFixed(2) : '$0.00';
+  return `${v} ${d} ${a}`;
+}
 
-async function extractReceiptData(file) { return WEG.extractReceiptData(file); }
+async function extractReceiptData(file) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const dataUrl = e.target.result;
+      const base64 = dataUrl.split(',')[1];
+      const mediaType = dataUrl.match(/data:([\w/]+);/)?.[1] || 'image/jpeg';
+      const isPDF = file.type === 'application/pdf';
+      try {
+        const body = {
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 300,
+          system: `You are a receipt OCR system. Extract key fields from receipt images and PDFs.
+Return ONLY valid JSON, no markdown:
+{"vendor":"Business name (short)","date":"MM-DD-YY","amount":9.73,"category":"Fuel|Supplies|Equipment|Parts|Food|Office|Travel|Other","confidence":0.95}
+If a field is not readable, use null. Amount is total charged as a number.`,
+          messages: [{ role: 'user', content: isPDF
+            ? [{ type:'document', source:{type:'base64', media_type:'application/pdf', data:base64} }, { type:'text', text:'Extract vendor, date, total amount, and category from this receipt.' }]
+            : [{ type:'image', source:{type:'base64', media_type:mediaType, data:base64} }, { type:'text', text:'Extract vendor, date, total amount, and category from this receipt.' }]
+          }]
+        };
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+        });
+        const data = await response.json();
+        const raw = data.content?.map(c => c.text || '').join('') || '';
+        const parsed = JSON.parse(raw.replace(/```json|```/g, '').trim());
+        resolve({ success: true, ...parsed });
+      } catch(err) {
+        resolve({ success: false, vendor: null, date: null, amount: null, category: '— review', confidence: 0 });
+      }
+    };
+    reader.readAsDataURL(file);
+  });
+}
 
 function rvHandleFiles(files, method) {
-  WEG.rvHandleFiles(files, method, 'upload-preview', function(record) {
-    activeCompany().receipts.unshift(record);
+  if (!files?.length) return;
+  const preview = document.getElementById('upload-preview');
+  if (!preview) return;
+  preview.style.display = 'flex';
+  preview.style.flexDirection = 'column';
+  preview.style.gap = '8px';
+
+  const items = Array.from(files).map(f => {
+    const isImg = f.type.startsWith('image/');
+    const isPDF = f.type === 'application/pdf';
+    const url = isImg ? URL.createObjectURL(f) : null;
+    const id = 'prev-' + Date.now() + Math.random().toString(36).slice(2);
+    return { f, url, id, isImg, isPDF };
+  });
+
+  preview.innerHTML = items.map(({f, url, id, isPDF}) => `
+    <div class="preview-item" id="${id}">
+      ${url ? `<img class="preview-thumb" src="${url}" alt="">` : `<div class="preview-thumb-placeholder">${isPDF ? '📄' : '🖼️'}</div>`}
+      <div class="preview-info">
+        <div class="preview-name" style="font-size:11px;color:var(--ink3);">${f.name}</div>
+        <div class="preview-meta">Reading receipt…</div>
+      </div>
+      <span class="preview-status processing">AI Reading</span>
+    </div>`).join('');
+
+  items.forEach(async ({f, url, id}) => {
+    const extracted = await extractReceiptData(f);
+    const row = document.getElementById(id);
+    const today = new Date();
+    const fallbackDate = [String(today.getMonth()+1).padStart(2,'0'), String(today.getDate()).padStart(2,'0'), String(today.getFullYear()).slice(2)].join('-');
+    const vendor   = extracted.vendor   || f.name.replace(/\.[^.]+$/, '').replace(/[-_]/g,' ').trim();
+    const date     = extracted.date     || fallbackDate;
+    const amount   = extracted.amount   || 0;
+    const category = extracted.category || '— review';
+    const recId    = 'r' + Date.now() + Math.floor(Math.random()*10000);
+    const recName  = formatReceiptName(vendor, date, amount);
+    if (row) {
+      const infoEl = row.querySelector('.preview-info');
+      const statusEl = row.querySelector('.preview-status');
+      if (infoEl) infoEl.innerHTML = `<div class="receipt-name-wrap"><div class="receipt-name-display" id="name-disp-${recId}" onclick="rvEditName('${recId}')">${recName}</div></div><div class="preview-meta">${category} · ${methodLabel[method]||method} <span class="edit-hint">tap to edit</span></div>`;
+      if (statusEl) { statusEl.textContent = extracted.success ? 'Added ✓' : 'Added*'; statusEl.className = 'preview-status ' + (extracted.success ? 'done' : 'error'); }
+    }
+    activeCompany().receipts.unshift({ id:recId, name:recName, vendor, date, amount, category, time:today.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}), employee:'Current User', status:'pending', method, confidence:extracted.confidence||0, note:extracted.success?'':'Low confidence — verify details' });
     const pendingCount = activeCompany().receipts.filter(r => r.status === 'pending').length;
     const badge = document.getElementById('pending-badge');
     if (badge) { badge.textContent = pendingCount; badge.style.display = 'inline-block'; }
   });
 }
 
-// rvEditName / rvSaveName — delegating to WEG shared library
-function rvEditName(recId) { WEG.rvEditName(recId); }
-function rvSaveName(recId, newName) { WEG.rvSaveName(recId, newName, activeCompany().receipts); }
+function rvEditName(recId) {
+  const disp = document.getElementById('name-disp-' + recId);
+  if (!disp) return;
+  const current = disp.textContent;
+  const wrap = disp.parentElement;
+  wrap.innerHTML = `<input class="receipt-name-input" id="name-inp-${recId}" value="${current}" onblur="rvSaveName('${recId}',this.value)" onkeydown="if(event.key==='Enter')this.blur();if(event.key==='Escape'){this.value='${current}';this.blur();}">`;
+  document.getElementById('name-inp-' + recId)?.select();
+}
+
+function rvSaveName(recId, newName) {
+  const trimmed = newName.trim() || 'Unknown Receipt';
+  const r = activeCompany().receipts.find(r => String(r.id) === String(recId));
+  if (r) r.name = trimmed;
+  const wrap = document.querySelector(`[id="name-inp-${recId}"]`)?.parentElement;
+  if (wrap) wrap.innerHTML = `<div class="receipt-name-display" id="name-disp-${recId}" onclick="rvEditName('${recId}')">${trimmed}</div>`;
+}
 
 function rvApprove(id) {
   const r = activeReceipts().find(r => String(r.id) === String(id));
