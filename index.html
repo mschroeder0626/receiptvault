@@ -374,6 +374,39 @@
 const CO_COLORS = ['#1d6fbf','#16a34a','#d97706','#dc2626','#7c3aed','#0891b2','#db2777','#65a30d'];
 let selectedColor = CO_COLORS[0];
 
+// ── CATEGORIES ──
+const RV_CATEGORIES = [
+  'Fuel & Oil', 'Parts & Repairs', 'Equipment', 'Supplies & Materials',
+  'Subcontractors', 'Labor', 'Meals & Entertainment', 'Office & Admin',
+  'Travel', 'Utilities', 'Insurance', 'Cost of Goods Sold', 'Other'
+];
+
+// ── PERSISTENCE ──
+const STORAGE_KEY = 'rv_data_v1';
+
+function saveState() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      activeCompanyId: RV.activeCompanyId,
+      companies: RV.companies
+    }));
+  } catch(e) {}
+}
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return false;
+    const data = JSON.parse(raw);
+    if (data.companies && data.companies.length > 0) {
+      RV.companies = data.companies;
+      RV.activeCompanyId = data.activeCompanyId || data.companies[0].id;
+      return true;
+    }
+  } catch(e) {}
+  return false;
+}
+
 // ── STATE ──
 const RV = {
   tab: 'capture',
@@ -473,11 +506,13 @@ function switchCompany(id) {
   RV.emailOpen = false;
   closeSwitcher();
   updatePill();
+  saveState();
   render();
 }
 
 function setDefault(id) {
   RV.companies.forEach(c => c.isDefault = c.id === id);
+  saveState();
   renderCompanyList();
 }
 
@@ -501,6 +536,7 @@ function addCompany() {
   selectedColor = CO_COLORS[RV.companies.length % CO_COLORS.length];
   closeSwitcher();
   updatePill();
+  saveState();
   render();
 }
 
@@ -729,7 +765,11 @@ function renderReceipts() {
               <div class="vendor-name">${r.name || formatReceiptName(r.vendor, r.date, r.amount)}</div>
               <div class="vendor-emp">${r.date} · ${r.employee}</div>
             </td>
-            <td class="hide-mobile"><span class="badge cat">${r.category}</span></td>
+            <td class="hide-mobile">
+              <select onchange="rvChangeCategory('${r.id}',this.value)" style="font-size:10px;font-weight:600;padding:2px 6px;border-radius:5px;border:1px solid var(--rule);background:var(--paper3);color:var(--ink2);cursor:pointer;font-family:'DM Sans',sans-serif;">
+                ${RV_CATEGORIES.map(cat => `<option value="${cat}" ${cat===r.category?'selected':''}>${cat}</option>`).join('')}
+              </select>
+            </td>
             <td class="hide-mobile"><span title="${methodLabel[r.method]}" class="via-icon">${methodIcon[r.method]||'📁'}</span></td>
             <td class="amount">$${r.amount.toFixed(2)}</td>
             <td style="text-align:right;"><span class="badge ${r.status}">${r.status === 'synced' ? '✓ Synced' : '⏳ Review'}</span></td>
@@ -838,7 +878,7 @@ async function extractReceiptData(file) {
           max_tokens: 300,
           system: `You are a receipt OCR system. Extract key fields from receipt images and PDFs.
 Return ONLY valid JSON, no markdown:
-{"vendor":"Business name (short)","date":"MM-DD-YY","amount":9.73,"category":"Fuel|Supplies|Equipment|Parts|Food|Office|Travel|Other","confidence":0.95}
+{"vendor":"Business name (short)","date":"MM-DD-YY","amount":9.73,"category":"Fuel & Oil|Parts & Repairs|Equipment|Supplies & Materials|Subcontractors|Labor|Meals & Entertainment|Office & Admin|Travel|Utilities|Insurance|Cost of Goods Sold|Other","confidence":0.95}
 If a field is not readable, use null. Amount is total charged as a number.`,
           messages: [{ role: 'user', content: isPDF
             ? [{ type:'document', source:{type:'base64', media_type:'application/pdf', data:base64} }, { type:'text', text:'Extract vendor, date, total amount, and category from this receipt.' }]
@@ -894,7 +934,7 @@ function rvHandleFiles(files, method) {
     const vendor   = extracted.vendor   || f.name.replace(/\.[^.]+$/, '').replace(/[-_]/g,' ').trim();
     const date     = extracted.date     || fallbackDate;
     const amount   = extracted.amount   || 0;
-    const category = extracted.category || '— review';
+    const category = extracted.category || 'Other';
     const recId    = 'r' + Date.now() + Math.floor(Math.random()*10000);
     const recName  = formatReceiptName(vendor, date, amount);
     if (row) {
@@ -904,6 +944,7 @@ function rvHandleFiles(files, method) {
       if (statusEl) { statusEl.textContent = extracted.success ? 'Added ✓' : 'Added*'; statusEl.className = 'preview-status ' + (extracted.success ? 'done' : 'error'); }
     }
     activeCompany().receipts.unshift({ id:recId, name:recName, vendor, date, amount, category, time:today.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}), employee:'Current User', status:'pending', method, confidence:extracted.confidence||0, note:extracted.success?'':'Low confidence — verify details' });
+    saveState();
     const pendingCount = activeCompany().receipts.filter(r => r.status === 'pending').length;
     const badge = document.getElementById('pending-badge');
     if (badge) { badge.textContent = pendingCount; badge.style.display = 'inline-block'; }
@@ -922,7 +963,7 @@ function rvEditName(recId) {
 function rvSaveName(recId, newName) {
   const trimmed = newName.trim() || 'Unknown Receipt';
   const r = activeCompany().receipts.find(r => String(r.id) === String(recId));
-  if (r) r.name = trimmed;
+  if (r) { r.name = trimmed; saveState(); }
   const wrap = document.querySelector(`[id="name-inp-${recId}"]`)?.parentElement;
   if (wrap) wrap.innerHTML = `<div class="receipt-name-display" id="name-disp-${recId}" onclick="rvEditName('${recId}')">${trimmed}</div>`;
 }
@@ -1066,7 +1107,12 @@ function rvSendExport() {
 
 function rvApprove(id) {
   const r = activeReceipts().find(r => String(r.id) === String(id));
-  if (r) { r.status = 'synced'; render(); }
+  if (r) { r.status = 'synced'; saveState(); render(); }
+}
+
+function rvChangeCategory(id, newCat) {
+  const r = activeReceipts().find(r => String(r.id) === String(id));
+  if (r) { r.category = newCat; saveState(); render(); }
 }
 
 // ── BETA GATE ──
@@ -1135,6 +1181,7 @@ function submitGate() {
 
 // ── INIT ──
 function init() {
+  loadState();
   render();
   initSwitcher();
 }
