@@ -913,9 +913,12 @@ function renderCapture() {
     </div>
 
     <!-- MOBILE EMAIL OUT -->
-    <div class="show-mobile-only" style="padding:0 16px 8px;">
-      <button onclick="rvEmailReceipts()" style="width:100%;padding:14px;border-radius:12px;border:1.5px solid var(--blue);background:var(--blue-lt);color:var(--blue);font-size:14px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
-        ✉️ Email My Receipts
+    <div class="show-mobile-only" style="padding:0 16px 8px;display:flex;gap:8px;">
+      <button onclick="rvDownloadCSV()" style="flex:1;padding:14px;border-radius:12px;border:1.5px solid var(--rule);background:var(--paper2);color:var(--ink);font-size:13px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+        ⬇️ CSV
+      </button>
+      <button onclick="rvEmailReceipts()" style="flex:3;padding:14px;border-radius:12px;border:1.5px solid var(--blue);background:var(--blue-lt);color:var(--blue);font-size:13px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+        ✉️ Email Receipts + CSV
       </button>
     </div>
 
@@ -1552,41 +1555,75 @@ function rvZoomImage(url) {
 }
 
 // ── EMAIL RECEIPTS (mobile) ──
+function rvBuildCSV(receipts) {
+  const headers = ['Date','Vendor','Amount','Category','Status','Method','Employee','Note'];
+  const rows = receipts.map(r => [
+    r.date || '',
+    (r.vendor || r.name || '').replace(/,/g, ' '),
+    (r.amount || 0).toFixed(2),
+    (r.category || '').replace(/,/g, ' '),
+    r.status || '',
+    r.method || '',
+    (r.employee || '').replace(/,/g, ' '),
+    (r.note || '').replace(/,/g, ' ')
+  ]);
+  const total = receipts.reduce((s, r) => s + (r.amount || 0), 0);
+  rows.push(['', 'TOTAL', total.toFixed(2), '', '', '', '', '']);
+  return [headers, ...rows].map(r => r.map(v => `"${v}"`).join(',')).join('\n');
+}
+
+function rvDownloadCSV() {
+  const co = activeCompany();
+  const receipts = co.receipts || [];
+  if (!receipts.length) { alert('No receipts to export.'); return; }
+  const csv = rvBuildCSV(receipts);
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${co.name.replace(/\s+/g,'-')}-Receipts-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 function rvEmailReceipts() {
   const co = activeCompany();
   const receipts = co.receipts || [];
   if (!receipts.length) { alert('No receipts to send.'); return; }
 
-  const toAddr = co.emailOut || '';
+  // Step 1: Download the CSV automatically
+  rvDownloadCSV();
+
+  // Step 2: Get or prompt for email address
+  let toAddr = co.emailOut || '';
+  if (!toAddr) {
+    toAddr = prompt('Enter email address to send receipts to:');
+    if (!toAddr) return;
+    co.emailOut = toAddr;
+    saveState();
+  }
+
+  // Step 3: Open mail app with instructions to attach the CSV
+  const total = receipts.reduce((s, r) => s + (r.amount || 0), 0);
+  const pending = receipts.filter(r => r.status === 'pending').length;
+  const synced = receipts.filter(r => r.status === 'synced').length;
   const subject = encodeURIComponent(`${co.name} Receipts — ${new Date().toLocaleDateString()}`);
-
-  const lines = receipts.map(r =>
-    `${r.date}  ${(r.vendor||r.name||'').padEnd(30)}  $${(r.amount||0).toFixed(2).padStart(8)}  ${r.category||''}  [${r.status}]`
-  ).join('\n');
-
-  const total = receipts.reduce((s, r) => s + (r.amount||0), 0);
   const body = encodeURIComponent(
-    `${co.name} — Receipt Summary\n` +
+    `${co.name} — Receipt Export\n` +
     `Generated: ${new Date().toLocaleString()}\n\n` +
-    `${'─'.repeat(60)}\n` +
-    `DATE        VENDOR                         AMOUNT    CATEGORY\n` +
-    `${'─'.repeat(60)}\n` +
-    lines + '\n' +
-    `${'─'.repeat(60)}\n` +
-    `TOTAL: $${total.toFixed(2)}\n\n` +
+    `Summary:\n` +
+    `  Total Receipts: ${receipts.length}\n` +
+    `  Approved/Synced: ${synced}\n` +
+    `  Pending Review: ${pending}\n` +
+    `  Total Amount: $${total.toFixed(2)}\n\n` +
+    `The CSV file has been downloaded to your device.\n` +
+    `Please attach it to this email before sending.\n\n` +
     `Sent from ReceiptVault by WEG Consulting`
   );
 
-  // Prompt for email address if not set
-  if (!toAddr) {
-    const addr = prompt('Enter email address to send receipts to:');
-    if (!addr) return;
-    co.emailOut = addr;
-    saveState();
-    window.location.href = \`mailto:\${addr}?subject=\${subject}&body=\${body}\`;
-  } else {
-    window.location.href = \`mailto:\${toAddr}?subject=\${subject}&body=\${body}\`;
-  }
+  setTimeout(() => {
+    window.location.href = `mailto:${toAddr}?subject=${subject}&body=${body}`;
+  }, 500);
 }
 
 // ── BETA GATE ──
