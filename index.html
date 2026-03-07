@@ -1196,7 +1196,18 @@ function rvHandleFiles(files, method) {
       if (infoEl) infoEl.innerHTML = `<div class="receipt-name-wrap"><div class="receipt-name-display" id="name-disp-${recId}" onclick="rvEditName('${recId}')">${recName}</div></div><div class="preview-meta">${category} · ${methodLabel[method]||method} <span class="edit-hint">tap to edit</span></div>`;
       if (statusEl) { statusEl.textContent = extracted.success ? 'Added ✓' : 'Added*'; statusEl.className = 'preview-status ' + (extracted.success ? 'done' : 'error'); }
     }
-    activeCompany().receipts.unshift({ id:recId, name:recName, vendor, date, amount, category, time:today.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}), employee:'Current User', status:'pending', method, confidence:extracted.confidence||0, note:extracted.success?'':'Low confidence — verify details' });
+    // Save image as base64 for persistent display
+    let imageUrl = null;
+    if (f.type.startsWith('image/')) {
+      try {
+        imageUrl = await new Promise(res => {
+          const rd = new FileReader();
+          rd.onload = e => res(e.target.result);
+          rd.readAsDataURL(f);
+        });
+      } catch(e) { imageUrl = null; }
+    }
+    activeCompany().receipts.unshift({ id:recId, name:recName, vendor, date, amount, category, time:today.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}), employee:'Current User', status:'pending', method, confidence:extracted.confidence||0, note:extracted.success?'':'Low confidence — verify details', imageUrl });
     saveState();
     const pendingCount = activeCompany().receipts.filter(r => r.status === 'pending').length;
     const badge = document.getElementById('pending-badge');
