@@ -110,7 +110,7 @@
   .dropzone-link { color: var(--blue); font-weight: 500; text-decoration: none; }
 
   /* ── METHOD BUTTONS ── */
-  .method-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .method-grid { display: grid; grid-template-columns: repeat(1, 1fr); gap: 8px; }
   .method-btn {
     border: 1px solid var(--rule); border-radius: 10px; padding: 14px 10px;
     text-align: center; background: var(--paper2); cursor: pointer;
@@ -316,6 +316,10 @@
   .co-set-default { font-size: 10px; color: var(--blue); cursor: pointer; text-align: center; padding: 6px; }
   .co-set-default:hover { text-decoration: underline; }
 
+
+  /* Mobile only */
+  .show-mobile-only { display: block; }
+  @media (min-width: 768px) { .show-mobile-only { display: none !important; } }
 
   /* ── DESKTOP LAYOUT ── */
   @media (min-width: 768px) {
@@ -880,34 +884,18 @@ function renderCapture() {
           <input id="rv-browse-main" type="file" accept="image/*,application/pdf" multiple style="display:none" onchange="rvHandleFiles(this.files,'upload')">
         </div>
 
-        <!-- METHOD BUTTONS -->
-        <div class="method-grid">
-          <label class="method-btn" id="camera-btn-label" title="${isMobile ? 'Opens rear camera' : 'Camera available on mobile — opens file picker on desktop'}">
+        <!-- METHOD BUTTONS (mobile only) -->
+        <div class="method-grid show-mobile-only">
+          <label class="method-btn" id="camera-btn-label" >
             <input type="file" accept="image/*" id="camera-input" style="display:none" onchange="rvHandleFiles(this.files,'camera')">
             <div class="method-icon">📷</div>
             <span class="method-label">Camera</span>
             <span class="method-sub">${isMobile ? 'Open rear camera' : 'Mobile camera / browse'}</span>
           </label>
-          <div class="method-btn" onclick="toggleEmail()">
-            <div class="method-icon">✉️</div>
-            <span class="method-label">Email In</span>
-            <span class="method-sub">Forward any receipt</span>
-          </div>
+
         </div>
 
-        <!-- EMAIL DRAWER -->
-        <div class="email-drawer ${RV.emailOpen ? 'open' : ''}" id="email-drawer">
-          <div style="font-size:12px;font-weight:600;color:var(--blue);margin-bottom:8px;">✉️ Receipt Email Address</div>
-          <div style="font-size:11px;color:var(--ink3);margin-bottom:6px;">Forward receipts to this address — AI reads vendor, date, and amount automatically.</div>
-          <div style="display:flex;gap:6px;align-items:center;margin-bottom:10px;">
-            <input id="email-addr-input" 
-              style="flex:1;padding:8px 10px;border:1.5px solid var(--blue-mid);border-radius:8px;font-size:13px;font-family:'DM Sans',sans-serif;background:var(--paper);color:var(--ink);outline:none;"
-              value="${activeCompany().emailIn || ''}"
-              placeholder="e.g. mschroeder@dronesunlimitedusa.com"
-              onfocus="this.style.borderColor='var(--blue)'"
-              onblur="this.style.borderColor='var(--blue-mid)'">
-            <button onclick="rvSaveEmailIn()" style="padding:8px 14px;border-radius:8px;border:none;background:var(--blue);color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;">Save</button>
-          </div>
+
           ${activeCompany().emailIn ? `
           <div class="email-address" onclick="copyEmail()" title="Click to copy" style="margin-bottom:8px;">
             <span id="email-addr">${activeCompany().emailIn}</span>
@@ -922,6 +910,13 @@ function renderCapture() {
         <div class="upload-preview" id="upload-preview" style="display:none;"></div>
 
       </div>
+    </div>
+
+    <!-- MOBILE EMAIL OUT -->
+    <div class="show-mobile-only" style="padding:0 16px 8px;">
+      <button onclick="rvEmailReceipts()" style="width:100%;padding:14px;border-radius:12px;border:1.5px solid var(--blue);background:var(--blue-lt);color:var(--blue);font-size:14px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
+        ✉️ Email My Receipts
+      </button>
     </div>
 
     <!-- RECENT (last 3) -->
@@ -1098,11 +1093,7 @@ function renderSummary() {
 }
 
 // ── ACTIONS ──
-function toggleEmail() {
-  RV.emailOpen = !RV.emailOpen;
-  const drawer = document.getElementById('email-drawer');
-  if (drawer) drawer.classList.toggle('open', RV.emailOpen);
-}
+
 
 function copyEmail() {
   const addr = document.getElementById('email-addr')?.textContent || '';
@@ -1558,6 +1549,44 @@ function rvZoomImage(url) {
   overlay.onclick = () => overlay.remove();
   overlay.innerHTML = `<img src="${url}" style="max-width:95vw;max-height:95vh;object-fit:contain;border-radius:8px;">`;
   document.body.appendChild(overlay);
+}
+
+// ── EMAIL RECEIPTS (mobile) ──
+function rvEmailReceipts() {
+  const co = activeCompany();
+  const receipts = co.receipts || [];
+  if (!receipts.length) { alert('No receipts to send.'); return; }
+
+  const toAddr = co.emailOut || '';
+  const subject = encodeURIComponent(`${co.name} Receipts — ${new Date().toLocaleDateString()}`);
+
+  const lines = receipts.map(r =>
+    `${r.date}  ${(r.vendor||r.name||'').padEnd(30)}  $${(r.amount||0).toFixed(2).padStart(8)}  ${r.category||''}  [${r.status}]`
+  ).join('\n');
+
+  const total = receipts.reduce((s, r) => s + (r.amount||0), 0);
+  const body = encodeURIComponent(
+    `${co.name} — Receipt Summary\n` +
+    `Generated: ${new Date().toLocaleString()}\n\n` +
+    `${'─'.repeat(60)}\n` +
+    `DATE        VENDOR                         AMOUNT    CATEGORY\n` +
+    `${'─'.repeat(60)}\n` +
+    lines + '\n' +
+    `${'─'.repeat(60)}\n` +
+    `TOTAL: $${total.toFixed(2)}\n\n` +
+    `Sent from ReceiptVault by WEG Consulting`
+  );
+
+  // Prompt for email address if not set
+  if (!toAddr) {
+    const addr = prompt('Enter email address to send receipts to:');
+    if (!addr) return;
+    co.emailOut = addr;
+    saveState();
+    window.location.href = \`mailto:\${addr}?subject=\${subject}&body=\${body}\`;
+  } else {
+    window.location.href = \`mailto:\${toAddr}?subject=\${subject}&body=\${body}\`;
+  }
 }
 
 // ── BETA GATE ──
