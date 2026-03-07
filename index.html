@@ -316,13 +316,224 @@
   .co-set-default { font-size: 10px; color: var(--blue); cursor: pointer; text-align: center; padding: 6px; }
   .co-set-default:hover { text-decoration: underline; }
 
+
+  /* ── DESKTOP LAYOUT ── */
+  @media (min-width: 768px) {
+    body { overflow: auto; }
+    #app { 
+      max-width: 100%; 
+      flex-direction: row; 
+      height: 100vh;
+      box-shadow: none;
+    }
+    /* Left sidebar */
+    #app-sidebar {
+      width: 260px;
+      min-width: 260px;
+      border-right: 1px solid var(--rule);
+      display: flex;
+      flex-direction: column;
+      background: var(--paper);
+      height: 100vh;
+      position: sticky;
+      top: 0;
+    }
+    #app-main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      height: 100vh;
+      overflow: hidden;
+    }
+    /* Hide mobile header/tabs in desktop - shown in sidebar */
+    #mobile-header { display: none; }
+    #mobile-tabs { display: none; }
+    #desktop-sidebar-content { display: flex; flex-direction: column; height: 100%; }
+    
+    /* Desktop main area splits when receipt selected */
+    #main-split {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+    #main-content {
+      flex: 1;
+      overflow-y: auto;
+      min-width: 0;
+    }
+    #receipt-detail-panel {
+      width: 380px;
+      min-width: 380px;
+      border-left: 1px solid var(--rule);
+      background: var(--paper);
+      overflow-y: auto;
+      display: none;
+    }
+    #receipt-detail-panel.open {
+      display: block;
+    }
+    .stats-row { grid-template-columns: repeat(4, 1fr); }
+    th.hide-mobile, td.hide-mobile { display: table-cell; }
+  }
+
+  @media (max-width: 767px) {
+    #app-sidebar { display: none; }
+    #desktop-sidebar-content { display: none; }
+    #receipt-detail-panel { display: none !important; }
+    #main-split { display: contents; }
+  }
+
+  /* ── RECEIPT DETAIL PANEL ── */
+  .detail-img-wrap {
+    width: 100%; aspect-ratio: 4/3; background: var(--paper2);
+    border-bottom: 1px solid var(--rule);
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden; position: relative;
+  }
+  .detail-img-wrap img { width: 100%; height: 100%; object-fit: contain; }
+  .detail-img-placeholder { font-size: 64px; opacity: 0.2; }
+  .detail-field { padding: 14px 20px; border-bottom: 1px solid var(--rule2); }
+  .detail-field-label { font-size: 10px; font-weight: 700; color: var(--ink3); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
+  .detail-field-value { font-size: 14px; color: var(--ink); font-weight: 500; }
+  .detail-field-input {
+    width: 100%; padding: 8px 10px; border: 1.5px solid var(--rule);
+    border-radius: 8px; font-size: 14px; color: var(--ink);
+    background: var(--paper2); font-family: 'DM Sans', sans-serif;
+    outline: none; transition: border-color 0.15s;
+  }
+  .detail-field-input:focus { border-color: var(--blue); background: var(--paper); }
+  .detail-field-select {
+    width: 100%; padding: 8px 10px; border: 1.5px solid var(--rule);
+    border-radius: 8px; font-size: 14px; color: var(--ink);
+    background: var(--paper2); font-family: 'DM Sans', sans-serif;
+    outline: none; cursor: pointer;
+  }
+  .detail-field-select:focus { border-color: var(--blue); }
+  .detail-actions { padding: 16px 20px; display: flex; gap: 8px; }
+  .detail-close-btn {
+    position: absolute; top: 12px; right: 12px;
+    width: 28px; height: 28px; border-radius: 50%;
+    background: rgba(0,0,0,0.5); color: #fff;
+    border: none; cursor: pointer; font-size: 14px;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  /* ── RECEIPT VIEWER MODAL (mobile) ── */
+  .rv-modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(15,25,35,0.7);
+    z-index: 400; display: flex;
+    align-items: flex-end; justify-content: center;
+    padding: 0; animation: fadeIn 0.2s ease;
+  }
+  .rv-modal {
+    background: var(--paper);
+    border-radius: 20px 20px 0 0;
+    width: 100%; max-width: 600px;
+    max-height: 92vh; overflow-y: auto;
+    animation: slideUp 0.25s cubic-bezier(0.16,1,0.3,1);
+    padding-bottom: env(safe-area-inset-bottom, 20px);
+  }
+  .rv-modal-handle {
+    width: 36px; height: 4px; border-radius: 2px;
+    background: var(--rule); margin: 12px auto 0;
+  }
+  .rv-modal-header {
+    padding: 16px 20px 12px;
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid var(--rule);
+  }
+  .rv-modal-title { font-size: 16px; font-weight: 700; color: var(--ink); letter-spacing: -0.02em; }
+  .rv-modal-close {
+    width: 30px; height: 30px; border-radius: 50%;
+    background: var(--paper2); border: 1px solid var(--rule);
+    cursor: pointer; font-size: 14px; display: flex;
+    align-items: center; justify-content: center;
+  }
+
+  /* Desktop sidebar nav */
+  .sidebar-nav { padding: 8px; }
+  .sidebar-nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px; border-radius: 9px; cursor: pointer;
+    font-size: 13px; font-weight: 500; color: var(--ink3);
+    transition: all 0.15s; user-select: none;
+  }
+  .sidebar-nav-item:hover { background: var(--paper2); color: var(--ink); }
+  .sidebar-nav-item.active { background: var(--blue-lt); color: var(--blue); font-weight: 600; }
+  .sidebar-nav-icon { font-size: 16px; width: 20px; text-align: center; }
+  .sidebar-receipt-list { flex: 1; overflow-y: auto; border-top: 1px solid var(--rule); }
+  .sidebar-receipt-item {
+    padding: 11px 16px; border-bottom: 1px solid var(--rule2);
+    cursor: pointer; transition: background 0.12s;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .sidebar-receipt-item:hover { background: var(--paper2); }
+  .sidebar-receipt-item.active { background: var(--blue-lt); }
+  .sidebar-receipt-thumb {
+    width: 36px; height: 36px; border-radius: 6px;
+    object-fit: cover; border: 1px solid var(--rule); flex-shrink: 0;
+  }
+  .sidebar-receipt-thumb-ph {
+    width: 36px; height: 36px; border-radius: 6px;
+    background: var(--paper3); border: 1px solid var(--rule);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; flex-shrink: 0;
+  }
+  .sidebar-receipt-info { min-width: 0; flex: 1; }
+  .sidebar-receipt-name { font-size: 12px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sidebar-receipt-meta { font-size: 11px; color: var(--ink3); margin-top: 1px; }
+  .sidebar-receipt-amount { font-family: 'DM Mono', monospace; font-size: 12px; font-weight: 600; color: var(--ink); flex-shrink: 0; }
+
 </style>
 </head>
 <body>
 <div id="app" style="display:none">
 
-  <!-- HEADER -->
-  <header>
+  <!-- DESKTOP SIDEBAR -->
+  <div id="app-sidebar">
+    <div id="desktop-sidebar-content">
+      <!-- Sidebar Header -->
+      <div style="padding:16px 16px 12px;border-bottom:1px solid var(--rule);display:flex;align-items:center;gap:10px;">
+        <div class="logo-mark" style="width:32px;height:32px;font-size:16px;">🧾</div>
+        <div class="logo-text" style="font-size:17px;">Receipt<span>Vault</span></div>
+      </div>
+      <!-- Company switcher in sidebar -->
+      <div style="padding:10px 12px;border-bottom:1px solid var(--rule);">
+        <div class="co-switcher" id="co-switcher-desktop">
+          <div class="co-pill" style="width:100%;justify-content:flex-start;" id="co-pill-desktop" onclick="toggleSwitcher(event,'desktop')">
+            <div class="co-dot" id="co-dot-desktop"></div>
+            <span id="co-name-label-desktop" style="flex:1;">Loading…</span>
+            <span class="co-chevron" id="co-chevron-desktop">▼</span>
+          </div>
+        </div>
+      </div>
+      <!-- Nav items -->
+      <div class="sidebar-nav">
+        <div class="sidebar-nav-item active" id="snav-capture" onclick="switchTab('capture')">
+          <span class="sidebar-nav-icon">📷</span> Capture
+        </div>
+        <div class="sidebar-nav-item" id="snav-receipts" onclick="switchTab('receipts')">
+          <span class="sidebar-nav-icon">🧾</span> Receipts
+          <span class="tab-badge" id="pending-badge-desktop" style="display:none;margin-left:auto;"></span>
+        </div>
+        <div class="sidebar-nav-item" id="snav-summary" onclick="switchTab('summary')">
+          <span class="sidebar-nav-icon">📊</span> Summary
+        </div>
+      </div>
+      <!-- Recent receipts list in sidebar -->
+      <div class="sidebar-receipt-list" id="sidebar-receipt-list"></div>
+      <!-- Powered by -->
+      <div class="powered" style="margin-top:auto;">
+        <a href="https://wegconsulting.com">WEG Consulting</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- MOBILE HEADER -->
+  <div id="app-main">
+  <header id="mobile-header">
     <div class="logo-mark">🧾</div>
     <div>
       <div class="logo-text">Receipt<span>Vault</span></div>
@@ -353,15 +564,18 @@
     </div>
   </header>
 
-  <!-- TABS -->
-  <div class="tabs">
+  <!-- TABS (mobile only) -->
+  <div class="tabs" id="mobile-tabs">
     <div class="tab active" onclick="switchTab('capture')">Capture</div>
     <div class="tab" onclick="switchTab('receipts')">Receipts <span class="tab-badge" id="pending-badge" style="display:none"></span></div>
     <div class="tab" onclick="switchTab('summary')">Summary</div>
   </div>
 
   <!-- MAIN CONTENT -->
-  <main id="main-content"></main>
+  <div id="main-split">
+    <main id="main-content"></main>
+    <div id="receipt-detail-panel"></div>
+  </div>
 
   <!-- POWERED BY -->
   <div class="powered">
@@ -448,6 +662,11 @@ function updatePill() {
   const lbl = document.getElementById('co-name-label');
   if (dot) dot.style.background = co.color;
   if (lbl) lbl.textContent = co.name;
+  // Desktop sidebar sync
+  const dotD = document.getElementById('co-dot-desktop');
+  const lblD = document.getElementById('co-name-label-desktop');
+  if (dotD) dotD.style.background = co.color;
+  if (lblD) lblD.textContent = co.name;
 }
 
 function renderCompanyList() {
@@ -547,10 +766,17 @@ const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
 
 function switchTab(tab) {
   RV.tab = tab;
+  // Mobile tabs
   document.querySelectorAll('.tab').forEach((t, i) => {
     t.classList.toggle('active', ['capture','receipts','summary'][i] === tab);
   });
+  // Desktop sidebar nav
+  ['capture','receipts','summary'].forEach(t => {
+    const el = document.getElementById('snav-' + t);
+    if (el) el.classList.toggle('active', t === tab);
+  });
   render();
+  renderSidebarReceipts();
 }
 
 function render() {
@@ -571,10 +797,32 @@ function render() {
     if (camInput) camInput.setAttribute('capture', 'environment');
   }
 
-  // Update pending badge
+  // Update pending badges (mobile + desktop)
   const pending = activeReceipts().filter(r => r.status === 'pending').length;
   const badge = document.getElementById('pending-badge');
   if (badge) { badge.textContent = pending; badge.style.display = pending ? 'inline-block' : 'none'; }
+  const badgeD = document.getElementById('pending-badge-desktop');
+  if (badgeD) { badgeD.textContent = pending; badgeD.style.display = pending ? 'inline-block' : 'none'; }
+  renderSidebarReceipts();
+}
+
+function renderSidebarReceipts() {
+  const list = document.getElementById('sidebar-receipt-list');
+  if (!list) return;
+  const receipts = activeReceipts();
+  if (receipts.length === 0) {
+    list.innerHTML = '<div style="padding:20px 16px;text-align:center;font-size:12px;color:var(--ink3);">No receipts yet</div>';
+    return;
+  }
+  list.innerHTML = receipts.map(r => `
+    <div class="sidebar-receipt-item ${RV.selectedReceiptId === r.id ? 'active' : ''}" onclick="openReceiptDetail('${r.id}')">
+      ${r.imageUrl ? `<img class="sidebar-receipt-thumb" src="${r.imageUrl}" alt="">` : `<div class="sidebar-receipt-thumb-ph">${r.method==='camera'?'📷':r.method==='email'?'✉️':'📄'}</div>`}
+      <div class="sidebar-receipt-info">
+        <div class="sidebar-receipt-name">${r.name || formatReceiptName(r.vendor, r.date, r.amount)}</div>
+        <div class="sidebar-receipt-meta">${r.date} · <span style="color:${r.status==='synced'?'var(--green)':'var(--amber)'};">${r.status==='synced'?'Synced':'Pending'}</span></div>
+      </div>
+      <div class="sidebar-receipt-amount">$${(r.amount||0).toFixed(2)}</div>
+    </div>`).join('');
 }
 
 // ── CAPTURE TAB ──
@@ -687,7 +935,7 @@ function renderCapture() {
           <th class="right">Status</th>
         </tr></thead>
         <tbody>
-          ${receipts.slice(0,5).map(r => `<tr>
+          ${receipts.slice(0,5).map(r => `<tr style="cursor:pointer;" onclick="openReceiptDetail('${r.id}')">
             <td>
               <div class="vendor-name">${r.name || formatReceiptName(r.vendor, r.date, r.amount)}</div>
               <div class="vendor-emp">${r.date} · ${r.employee}</div>
@@ -735,8 +983,8 @@ function renderReceipts() {
           <th class="right">Action</th>
         </tr></thead>
         <tbody>
-          ${pending.map(r => `<tr>
-            <td><input type="checkbox" class="rv-select" data-id="${r.id}" style="width:15px;height:15px;accent-color:var(--blue);cursor:pointer;"></td>
+          ${pending.map(r => `<tr style="cursor:pointer;" onclick="openReceiptDetail('${r.id}')">
+            <td onclick="event.stopPropagation()"><input type="checkbox" class="rv-select" data-id="${r.id}" style="width:15px;height:15px;accent-color:var(--blue);cursor:pointer;"></td>
             <td>
               <div class="vendor-name">${r.name || formatReceiptName(r.vendor, r.date, r.amount)}</div>
               <div class="vendor-emp">${r.date} · ${r.time} · ${r.employee}</div>
@@ -764,8 +1012,8 @@ function renderReceipts() {
           <th class="right">Status</th>
         </tr></thead>
         <tbody>
-          ${allReceipts.map(r => `<tr>
-            <td><input type="checkbox" class="rv-select" data-id="${r.id}" style="width:15px;height:15px;accent-color:var(--blue);cursor:pointer;" onchange="rvUpdateSelectCount()"></td>
+          ${allReceipts.map(r => `<tr style="cursor:pointer;" onclick="openReceiptDetail('${r.id}')">
+            <td onclick="event.stopPropagation()"><input type="checkbox" class="rv-select" data-id="${r.id}" style="width:15px;height:15px;accent-color:var(--blue);cursor:pointer;" onchange="rvUpdateSelectCount()"></td>
             <td>
               <div class="vendor-name">${r.name || formatReceiptName(r.vendor, r.date, r.amount)}</div>
               <div class="vendor-emp">${r.date} · ${r.employee}</div>
@@ -1162,6 +1410,139 @@ function rvConfirmApprove(id) {
 function rvChangeCategory(id, newCat) {
   const r = activeReceipts().find(r => String(r.id) === String(id));
   if (r) { r.category = newCat; saveState(); render(); }
+}
+
+// ── RECEIPT DETAIL / VIEWER ──
+function openReceiptDetail(id) {
+  const r = activeReceipts().find(r => String(r.id) === String(id));
+  if (!r) return;
+  RV.selectedReceiptId = id;
+
+  const isDesktop = window.innerWidth >= 768;
+
+  if (isDesktop) {
+    // Desktop: show in side panel
+    const panel = document.getElementById('receipt-detail-panel');
+    if (!panel) return;
+    panel.classList.add('open');
+    panel.innerHTML = buildDetailHTML(r, false);
+    renderSidebarReceipts();
+  } else {
+    // Mobile: show modal
+    const overlay = document.createElement('div');
+    overlay.className = 'rv-modal-overlay';
+    overlay.id = 'receipt-modal-overlay';
+    overlay.onclick = (e) => { if (e.target === overlay) closeReceiptDetail(); };
+    overlay.innerHTML = `<div class="rv-modal">${buildDetailHTML(r, true)}</div>`;
+    document.body.appendChild(overlay);
+  }
+}
+
+function buildDetailHTML(r, isModal) {
+  const catOptions = RV_CATEGORIES.map(cat =>
+    `<option value="${cat}" ${cat === r.category ? 'selected' : ''}>${cat}</option>`
+  ).join('');
+
+  const header = isModal ? `
+    <div class="rv-modal-handle"></div>
+    <div class="rv-modal-header">
+      <div class="rv-modal-title">Receipt Details</div>
+      <button class="rv-modal-close" onclick="closeReceiptDetail()">✕</button>
+    </div>` : `
+    <div style="padding:14px 20px;border-bottom:1px solid var(--rule);display:flex;align-items:center;justify-content:space-between;">
+      <div style="font-size:14px;font-weight:700;color:var(--ink);letter-spacing:-0.02em;">Receipt Details</div>
+      <button onclick="closeReceiptDetail()" style="background:var(--paper2);border:1px solid var(--rule);border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;color:var(--ink3);">Close ✕</button>
+    </div>`;
+
+  const imgSection = r.imageUrl ? `
+    <div class="detail-img-wrap">
+      <img src="${r.imageUrl}" alt="Receipt image" onclick="rvZoomImage('${r.imageUrl}')" style="cursor:zoom-in;">
+    </div>` : `
+    <div class="detail-img-wrap" style="height:140px;">
+      <div class="detail-img-placeholder">🧾</div>
+    </div>`;
+
+  return `
+    ${header}
+    ${imgSection}
+    <div class="detail-field">
+      <div class="detail-field-label">Receipt Name</div>
+      <input class="detail-field-input" id="detail-name-${r.id}" value="${(r.name || formatReceiptName(r.vendor, r.date, r.amount)).replace(/"/g,'&quot;')}" onblur="rvDetailSave('${r.id}')">
+    </div>
+    <div class="detail-field">
+      <div class="detail-field-label">Vendor</div>
+      <input class="detail-field-input" id="detail-vendor-${r.id}" value="${(r.vendor||'').replace(/"/g,'&quot;')}" onblur="rvDetailSave('${r.id}')">
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--rule2);">
+      <div class="detail-field" style="border-bottom:none;border-right:1px solid var(--rule2);">
+        <div class="detail-field-label">Date</div>
+        <input class="detail-field-input" id="detail-date-${r.id}" value="${r.date||''}" onblur="rvDetailSave('${r.id}')">
+      </div>
+      <div class="detail-field" style="border-bottom:none;">
+        <div class="detail-field-label">Amount</div>
+        <input class="detail-field-input" id="detail-amount-${r.id}" value="${(r.amount||0).toFixed(2)}" type="number" step="0.01" onblur="rvDetailSave('${r.id}')">
+      </div>
+    </div>
+    <div class="detail-field">
+      <div class="detail-field-label">Category</div>
+      <select class="detail-field-select" id="detail-cat-${r.id}" onchange="rvDetailSave('${r.id}')">
+        ${catOptions}
+      </select>
+    </div>
+    <div class="detail-field">
+      <div class="detail-field-label">Status</div>
+      <div style="display:flex;gap:8px;margin-top:4px;">
+        <span class="badge ${r.status}">${r.status === 'synced' ? '✓ Synced' : '⏳ Pending Review'}</span>
+        ${r.status === 'pending' ? `<button onclick="rvApprove('${r.id}')" style="padding:3px 10px;border-radius:5px;border:1px solid var(--blue);background:transparent;color:var(--blue);cursor:pointer;font-size:11px;font-weight:600;font-family:'DM Sans',sans-serif;">Approve →</button>` : ''}
+      </div>
+    </div>
+    ${r.note ? `<div class="detail-field"><div class="detail-field-label">Note</div><div style="font-size:12px;color:var(--ink3);">${r.note}</div></div>` : ''}
+    <div class="detail-actions">
+      <button onclick="rvDeleteReceipt('${r.id}')" style="padding:10px 14px;border-radius:8px;border:1px solid #fecaca;background:#fef2f2;color:var(--red);font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;">Delete</button>
+      <button onclick="closeReceiptDetail()" style="flex:1;padding:10px 14px;border-radius:8px;border:none;background:var(--blue);color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;">Done</button>
+    </div>`;
+}
+
+function closeReceiptDetail() {
+  RV.selectedReceiptId = null;
+  document.getElementById('receipt-modal-overlay')?.remove();
+  const panel = document.getElementById('receipt-detail-panel');
+  if (panel) { panel.classList.remove('open'); panel.innerHTML = ''; }
+  renderSidebarReceipts();
+}
+
+function rvDetailSave(id) {
+  const r = activeReceipts().find(r => String(r.id) === String(id));
+  if (!r) return;
+  const name = document.getElementById('detail-name-' + id)?.value.trim();
+  const vendor = document.getElementById('detail-vendor-' + id)?.value.trim();
+  const date = document.getElementById('detail-date-' + id)?.value.trim();
+  const amount = parseFloat(document.getElementById('detail-amount-' + id)?.value) || 0;
+  const cat = document.getElementById('detail-cat-' + id)?.value;
+  if (name) r.name = name;
+  if (vendor) r.vendor = vendor;
+  if (date) r.date = date;
+  r.amount = amount;
+  if (cat) r.category = cat;
+  saveState();
+  render();
+}
+
+function rvDeleteReceipt(id) {
+  if (!confirm('Delete this receipt?')) return;
+  const co = activeCompany();
+  co.receipts = co.receipts.filter(r => String(r.id) !== String(id));
+  saveState();
+  closeReceiptDetail();
+  render();
+}
+
+function rvZoomImage(url) {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out;';
+  overlay.onclick = () => overlay.remove();
+  overlay.innerHTML = `<img src="${url}" style="max-width:95vw;max-height:95vh;object-fit:contain;border-radius:8px;">`;
+  document.body.appendChild(overlay);
 }
 
 // ── BETA GATE ──
