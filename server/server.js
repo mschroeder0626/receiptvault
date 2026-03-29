@@ -15,7 +15,7 @@ app.use(express.json({ limit: '20mb' }));
 
 // Serve index.html with injected Supabase config
 app.get('/', (req, res) => {
-  const indexPath = path.join(__dirname, '..', 'index.html');
+  const indexPath = path.join(__dirname, 'index.html');
   let html = fs.readFileSync(indexPath, 'utf8');
   // Inject config before the app script
   const configScript = `<script>
@@ -27,7 +27,7 @@ app.get('/', (req, res) => {
 });
 
 // Serve static files (for any future assets)
-app.use(express.static(path.join(__dirname, '..')));
+app.use(express.static(__dirname));
 
 // Health check
 app.get('/health', (req, res) => {
