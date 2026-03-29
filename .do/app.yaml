@@ -1,0 +1,23 @@
+name: receiptvault
+services:
+  - name: receiptvault
+    source_dir: /server
+    github:
+      repo: mschroeder0626/receiptvault
+      branch: main
+      deploy_on_push: true
+    environment_slug: node-js
+    instance_count: 1
+    instance_size_slug: apps-s-1vcpu-0.5gb
+    http_port: 3000
+    run_command: node server.js
+    envs:
+      - key: ANTHROPIC_API_KEY
+        scope: RUN_TIME
+        type: SECRET
+      - key: SUPABASE_URL
+        scope: RUN_TIME
+        value: https://iargqldhonzpajsfmguv.supabase.co
+      - key: SUPABASE_ANON_KEY
+        scope: RUN_TIME
+        value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlhcmdxbGRob256cGFqc2ZtZ3V2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3ODkwODEsImV4cCI6MjA5MDM2NTA4MX0.OQmpfmqZMPuIDZ2c0Udy5biIeL6CsAnRh7zcliEGOVo

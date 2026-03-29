@@ -10,6 +10,7 @@
 <meta name="description" content="Capture, organize, and sync business receipts from anywhere. Camera, upload, drag & drop, or email.">
 <title>ReceiptVault — Business Receipt Management</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
   :root {
     --ink:       #0f1923;
@@ -528,9 +529,10 @@
       </div>
       <!-- Recent receipts list in sidebar -->
       <div class="sidebar-receipt-list" id="sidebar-receipt-list"></div>
-      <!-- Powered by -->
+      <!-- Powered by / Sign out -->
       <div class="powered" style="margin-top:auto;">
         <a href="https://wegconsulting.com">WEG Consulting</a>
+        &nbsp;·&nbsp; <a href="#" onclick="signOut();return false;" style="color:var(--red);">Sign Out</a>
       </div>
     </div>
   </div>
@@ -583,11 +585,17 @@
 
   <!-- POWERED BY -->
   <div class="powered">
-    <a href="https://wegconsulting.com">ReceiptVault by WEG Consulting</a> &nbsp;·&nbsp; AI-powered receipt management
+    <a href="https://wegconsulting.com">ReceiptVault by WEG Consulting</a> &nbsp;·&nbsp; <a href="#" onclick="signOut();return false;" style="color:var(--red);">Sign Out</a>
   </div>
 </div>
 
 <script>
+// ── SUPABASE CLIENT ──
+const SUPABASE_URL = window.__SUPABASE_URL__ || '';
+const SUPABASE_ANON_KEY = window.__SUPABASE_ANON_KEY__ || '';
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let currentUser = null;
+
 // ── COMPANY COLORS ──
 const CO_COLORS = ['#1d6fbf','#16a34a','#d97706','#dc2626','#7c3aed','#0891b2','#db2777','#65a30d'];
 let selectedColor = CO_COLORS[0];
@@ -599,27 +607,127 @@ const RV_CATEGORIES = [
   'Travel', 'Utilities', 'Insurance', 'Cost of Goods Sold', 'Other'
 ];
 
-// ── PERSISTENCE ──
-const STORAGE_KEY = 'rv_data_v1';
+// ── SUPABASE PERSISTENCE ──
+async function saveReceipt(receipt) {
+  if (!currentUser) return;
+  const row = {
+    id: receipt.id.length > 30 ? receipt.id : undefined,
+    user_id: currentUser.id,
+    merchant: receipt.vendor || null,
+    amount: receipt.amount || 0,
+    receipt_date: convertToISO(receipt.date) || new Date().toISOString().slice(0, 10),
+    notes: receipt.note || null,
+    image_url: receipt.imageUrl || null,
+    payment_method: receipt.method || null,
+    is_business_expense: true,
+    ocr_raw: { name: receipt.name, employee: receipt.employee, time: receipt.time, status: receipt.status, confidence: receipt.confidence, method: receipt.method, companyId: receipt.companyId || RV.activeCompanyId }
+  };
+  // Look up or create category
+  const catId = await getOrCreateCategory(receipt.category);
+  if (catId) row.category_id = catId;
 
-function saveState() {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      activeCompanyId: RV.activeCompanyId,
-      companies: RV.companies
-    }));
-  } catch(e) {}
+  const { data, error } = await supabase.from('rv_receipts').upsert(row, { onConflict: 'id' }).select().single();
+  if (error) { console.error('Save receipt error:', error); return null; }
+  return data;
 }
 
-function loadState() {
+async function getOrCreateCategory(name) {
+  if (!name || !currentUser) return null;
+  const { data: existing } = await supabase.from('rv_categories').select('id').eq('user_id', currentUser.id).eq('name', name).single();
+  if (existing) return existing.id;
+  const { data: created } = await supabase.from('rv_categories').insert({ user_id: currentUser.id, name }).select('id').single();
+  return created?.id || null;
+}
+
+function convertToISO(dateStr) {
+  if (!dateStr) return null;
+  // Handle MM-DD-YY format
+  const parts = dateStr.split(/[-/]/);
+  if (parts.length === 3) {
+    let [m, d, y] = parts;
+    if (y.length === 2) y = '20' + y;
+    return `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
+  }
+  return dateStr;
+}
+
+function formatDateFromISO(isoStr) {
+  if (!isoStr) return '';
+  const d = new Date(isoStr + 'T00:00:00');
+  return [String(d.getMonth()+1).padStart(2,'0'), String(d.getDate()).padStart(2,'0'), String(d.getFullYear()).slice(2)].join('-');
+}
+
+async function loadReceipts() {
+  if (!currentUser) return [];
+  const { data, error } = await supabase
+    .from('rv_receipts')
+    .select('*, rv_categories(name)')
+    .eq('user_id', currentUser.id)
+    .order('created_at', { ascending: false });
+  if (error) { console.error('Load receipts error:', error); return []; }
+  return (data || []).map(r => ({
+    id: r.id,
+    name: r.ocr_raw?.name || formatReceiptName(r.merchant, formatDateFromISO(r.receipt_date), r.amount),
+    vendor: r.merchant || '',
+    date: formatDateFromISO(r.receipt_date),
+    amount: parseFloat(r.amount) || 0,
+    category: r.rv_categories?.name || 'Other',
+    time: r.ocr_raw?.time || '',
+    employee: r.ocr_raw?.employee || currentUser.email,
+    status: r.ocr_raw?.status || 'pending',
+    method: r.ocr_raw?.method || r.payment_method || 'upload',
+    confidence: r.ocr_raw?.confidence || 0,
+    note: r.notes || '',
+    imageUrl: r.image_url || null,
+    companyId: r.ocr_raw?.companyId || 'c1',
+    _supabaseId: r.id
+  }));
+}
+
+async function deleteReceiptFromDB(id) {
+  await supabase.from('rv_receipts').delete().eq('id', id);
+}
+
+async function uploadReceiptImage(file, receiptId) {
+  if (!currentUser) return null;
+  const ext = file.name.split('.').pop();
+  const path = `${currentUser.id}/${receiptId}.${ext}`;
+  const { error } = await supabase.storage.from('receipt-images').upload(path, file, { upsert: true });
+  if (error) { console.error('Upload error:', error); return null; }
+  const { data } = supabase.storage.from('receipt-images').getPublicUrl(path);
+  return data?.publicUrl || null;
+}
+
+// Thin wrappers to keep render code working with in-memory state
+function saveState() {
+  // No-op for localStorage — saves happen per-receipt to Supabase
+}
+
+async function loadState() {
+  const receipts = await loadReceipts();
+  const co = activeCompany();
+  co.receipts = receipts.filter(r => r.companyId === RV.activeCompanyId);
+  // Also populate other companies
+  RV.companies.forEach(c => {
+    if (c.id !== RV.activeCompanyId) {
+      c.receipts = receipts.filter(r => r.companyId === c.id);
+    }
+  });
+  // Persist company list to localStorage (lightweight — just names/colors, no receipts)
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    localStorage.setItem('rv_companies', JSON.stringify({ activeCompanyId: RV.activeCompanyId, companies: RV.companies.map(c => ({ id: c.id, name: c.name, color: c.color, isDefault: c.isDefault })) }));
+  } catch(e) {}
+  return true;
+}
+
+function loadCompanies() {
+  try {
+    const raw = localStorage.getItem('rv_companies');
     if (!raw) return false;
     const data = JSON.parse(raw);
     if (data.companies && data.companies.length > 0) {
-      RV.companies = data.companies;
+      RV.companies = data.companies.map(c => ({ ...c, receipts: [] }));
       RV.activeCompanyId = data.activeCompanyId || data.companies[0].id;
-      RV.tab = 'capture'; // always start on capture tab
       return true;
     }
   } catch(e) {}
@@ -725,12 +833,12 @@ function closeSwitcher() {
   if (af) af.classList.remove('open');
 }
 
-function switchCompany(id) {
+async function switchCompany(id) {
   RV.activeCompanyId = id;
   RV.emailOpen = false;
   closeSwitcher();
   updatePill();
-  saveState();
+  await loadState();
   render();
 }
 
@@ -750,7 +858,7 @@ function toggleAddForm() {
   }
 }
 
-function addCompany() {
+async function addCompany() {
   const name = document.getElementById('co-add-name')?.value.trim();
   if (!name) { document.getElementById('co-add-name')?.focus(); return; }
   if (RV.companies.length >= 5) return;
@@ -760,7 +868,7 @@ function addCompany() {
   selectedColor = CO_COLORS[RV.companies.length % CO_COLORS.length];
   closeSwitcher();
   updatePill();
-  saveState();
+  await loadState();
   render();
 }
 
@@ -1185,30 +1293,33 @@ function rvHandleFiles(files, method) {
     const date     = extracted.date     || fallbackDate;
     const amount   = extracted.amount   || 0;
     const category = extracted.category || 'Other';
-    const recId    = 'r' + Date.now() + Math.floor(Math.random()*10000);
+    const recId    = crypto.randomUUID();
     const recName  = formatReceiptName(vendor, date, amount);
     if (row) {
       const infoEl = row.querySelector('.preview-info');
       const statusEl = row.querySelector('.preview-status');
       if (infoEl) infoEl.innerHTML = `<div class="receipt-name-wrap"><div class="receipt-name-display" id="name-disp-${recId}" onclick="rvEditName('${recId}')">${recName}</div></div><div class="preview-meta">${category} · ${methodLabel[method]||method} <span class="edit-hint">tap to edit</span></div>`;
-      if (statusEl) { statusEl.textContent = extracted.success ? 'Added ✓' : 'Added*'; statusEl.className = 'preview-status ' + (extracted.success ? 'done' : 'error'); }
+      if (statusEl) { statusEl.textContent = extracted.success ? 'Saving…' : 'Saving…'; statusEl.className = 'preview-status processing'; }
     }
-    // Save image as base64 for persistent display
+    // Upload image to Supabase Storage
     let imageUrl = null;
     if (f.type.startsWith('image/')) {
-      try {
-        imageUrl = await new Promise(res => {
-          const rd = new FileReader();
-          rd.onload = e => res(e.target.result);
-          rd.readAsDataURL(f);
-        });
-      } catch(e) { imageUrl = null; }
+      imageUrl = await uploadReceiptImage(f, recId);
     }
-    activeCompany().receipts.unshift({ id:recId, name:recName, vendor, date, amount, category, time:today.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}), employee:'Current User', status:'pending', method, confidence:extracted.confidence||0, note:extracted.success?'':'Low confidence — verify details', imageUrl });
-    saveState();
+    const receipt = { id:recId, name:recName, vendor, date, amount, category, time:today.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}), employee:currentUser?.email || 'Current User', status:'pending', method, confidence:extracted.confidence||0, note:extracted.success?'':'Low confidence — verify details', imageUrl, companyId: RV.activeCompanyId };
+    // Save to Supabase
+    const saved = await saveReceipt(receipt);
+    if (saved) receipt.id = saved.id;
+    activeCompany().receipts.unshift(receipt);
+    // Update UI
+    if (row) {
+      const statusEl = row.querySelector('.preview-status');
+      if (statusEl) { statusEl.textContent = extracted.success ? 'Saved ✓' : 'Saved*'; statusEl.className = 'preview-status ' + (extracted.success ? 'done' : 'error'); }
+    }
     const pendingCount = activeCompany().receipts.filter(r => r.status === 'pending').length;
     const badge = document.getElementById('pending-badge');
     if (badge) { badge.textContent = pendingCount; badge.style.display = 'inline-block'; }
+    renderSidebarReceipts();
   });
 }
 
@@ -1221,10 +1332,10 @@ function rvEditName(recId) {
   document.getElementById('name-inp-' + recId)?.select();
 }
 
-function rvSaveName(recId, newName) {
+async function rvSaveName(recId, newName) {
   const trimmed = newName.trim() || 'Unknown Receipt';
   const r = activeCompany().receipts.find(r => String(r.id) === String(recId));
-  if (r) { r.name = trimmed; saveState(); }
+  if (r) { r.name = trimmed; await saveReceipt(r); }
   const wrap = document.querySelector(`[id="name-inp-${recId}"]`)?.parentElement;
   if (wrap) wrap.innerHTML = `<div class="receipt-name-display" id="name-disp-${recId}" onclick="rvEditName('${recId}')">${trimmed}</div>`;
 }
@@ -1403,22 +1514,22 @@ function rvApprove(id) {
   document.body.appendChild(overlay);
 }
 
-function rvConfirmApprove(id) {
+async function rvConfirmApprove(id) {
   const r = activeReceipts().find(r => String(r.id) === String(id));
   const cat = document.getElementById('approve-cat')?.value;
   if (r) {
     r.status = 'synced';
     if (cat) r.category = cat;
-    saveState();
+    await saveReceipt(r);
   }
   document.getElementById('approve-overlay')?.remove();
   closeReceiptDetail();
   render();
 }
 
-function rvChangeCategory(id, newCat) {
+async function rvChangeCategory(id, newCat) {
   const r = activeReceipts().find(r => String(r.id) === String(id));
-  if (r) { r.category = newCat; saveState(); render(); }
+  if (r) { r.category = newCat; await saveReceipt(r); render(); }
 }
 
 // ── RECEIPT DETAIL / VIEWER ──
@@ -1520,7 +1631,7 @@ function closeReceiptDetail() {
   renderSidebarReceipts();
 }
 
-function rvDetailSave(id) {
+async function rvDetailSave(id) {
   const r = activeReceipts().find(r => String(r.id) === String(id));
   if (!r) return;
   const name = document.getElementById('detail-name-' + id)?.value.trim();
@@ -1533,15 +1644,15 @@ function rvDetailSave(id) {
   if (date) r.date = date;
   r.amount = amount;
   if (cat) r.category = cat;
-  saveState();
+  await saveReceipt(r);
   render();
 }
 
-function rvDeleteReceipt(id) {
+async function rvDeleteReceipt(id) {
   if (!confirm('Delete this receipt?')) return;
+  await deleteReceiptFromDB(id);
   const co = activeCompany();
   co.receipts = co.receipts.filter(r => String(r.id) !== String(id));
-  saveState();
   closeReceiptDetail();
   render();
 }
@@ -1626,19 +1737,13 @@ function rvEmailReceipts() {
   }, 500);
 }
 
-// ── BETA GATE ──
-const BETA_PASS = 'Pa$$w0rd';
-const GATE_KEY  = 'rv_beta_auth';
-
-function checkGate() {
-  if (sessionStorage.getItem(GATE_KEY) === '1') return true;
-  return false;
-}
-
-function showGate() {
+// ── AUTH UI ──
+function showAuthScreen() {
   document.getElementById('app').style.display = 'none';
+  let existing = document.getElementById('auth-gate');
+  if (existing) existing.remove();
   const gate = document.createElement('div');
-  gate.id = 'beta-gate';
+  gate.id = 'auth-gate';
   gate.innerHTML = `
     <div style="position:fixed;inset:0;background:var(--ink,#0f1923);display:flex;align-items:center;justify-content:center;padding:24px;z-index:9999;">
       <div style="background:#fff;border-radius:20px;padding:40px 36px;width:100%;max-width:380px;box-shadow:0 24px 64px rgba(0,0,0,0.4);animation:gateIn 0.35s cubic-bezier(0.16,1,0.3,1) both;">
@@ -1646,64 +1751,155 @@ function showGate() {
           <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#1d6fbf,#1a4fa0);display:flex;align-items:center;justify-content:center;font-size:22px;box-shadow:0 4px 12px rgba(29,111,191,0.4);">🧾</div>
           <div>
             <div style="font-family:'Playfair Display',serif;font-size:22px;color:#0f1923;letter-spacing:-0.02em;">Receipt<span style="color:#1d6fbf;">Vault</span></div>
-            <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:0.1em;margin-top:2px;">Private Beta</div>
+            <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:0.1em;margin-top:2px;">by WEG Consulting</div>
           </div>
         </div>
-        <div style="font-size:20px;font-weight:600;color:#0f1923;margin-bottom:6px;letter-spacing:-0.02em;">Beta Access</div>
-        <div style="font-size:13px;color:#64748b;margin-bottom:24px;line-height:1.6;">This is an invite-only preview. Enter your access code to continue.</div>
+        <div id="auth-title" style="font-size:20px;font-weight:600;color:#0f1923;margin-bottom:6px;letter-spacing:-0.02em;">Sign In</div>
+        <div id="auth-subtitle" style="font-size:13px;color:#64748b;margin-bottom:24px;line-height:1.6;">Enter your email and password to continue.</div>
         <div style="margin-bottom:14px;">
-          <label style="display:block;font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:6px;">Access Code</label>
-          <input id="gate-input" type="password" placeholder="Enter code"
+          <label style="display:block;font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:6px;">Email</label>
+          <input id="auth-email" type="email" placeholder="you@example.com" autocapitalize="none"
             style="width:100%;padding:13px 14px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:15px;color:#0f1923;background:#f8fafc;font-family:'DM Sans',sans-serif;outline:none;-webkit-appearance:none;"
-            onkeydown="if(event.key==='Enter')submitGate()"
+            onkeydown="if(event.key==='Enter')document.getElementById('auth-password').focus()"
             onfocus="this.style.borderColor='#1d6fbf';this.style.boxShadow='0 0 0 3px rgba(29,111,191,0.12)'"
             onblur="this.style.borderColor='#e2e8f0';this.style.boxShadow='none'">
         </div>
-        <div id="gate-error" style="display:none;background:#fef2f2;border:1px solid #fecaca;color:#dc2626;border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:12px;">Incorrect code. Contact WEG Consulting for access.</div>
-        <button onclick="submitGate()"
+        <div style="margin-bottom:14px;">
+          <label style="display:block;font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:6px;">Password</label>
+          <input id="auth-password" type="password" placeholder="Your password"
+            style="width:100%;padding:13px 14px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:15px;color:#0f1923;background:#f8fafc;font-family:'DM Sans',sans-serif;outline:none;-webkit-appearance:none;"
+            onkeydown="if(event.key==='Enter')submitAuth()"
+            onfocus="this.style.borderColor='#1d6fbf';this.style.boxShadow='0 0 0 3px rgba(29,111,191,0.12)'"
+            onblur="this.style.borderColor='#e2e8f0';this.style.boxShadow='none'">
+        </div>
+        <div id="auth-error" style="display:none;background:#fef2f2;border:1px solid #fecaca;color:#dc2626;border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:12px;"></div>
+        <div id="auth-success" style="display:none;background:#f0fdf4;border:1px solid #bbf7d0;color:#16a34a;border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:12px;"></div>
+        <button id="auth-submit-btn" onclick="submitAuth()"
           style="width:100%;padding:14px;background:linear-gradient(135deg,#1d6fbf,#1a5fa8);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer;box-shadow:0 4px 14px rgba(29,111,191,0.35);">
-          Continue →
+          Sign In
         </button>
-        <div style="text-align:center;margin-top:18px;font-size:12px;color:#94a3b8;">Don't have a code? <a href="mailto:hello@wegconsulting.com?subject=ReceiptVault Beta Access" style="color:#1d6fbf;text-decoration:none;font-weight:500;">Request access</a></div>
+        <div style="text-align:center;margin-top:18px;font-size:13px;color:#64748b;">
+          <span id="auth-toggle-text">Don't have an account?</span>
+          <a href="#" id="auth-toggle-link" onclick="toggleAuthMode(event)" style="color:#1d6fbf;text-decoration:none;font-weight:600;margin-left:4px;">Sign Up</a>
+        </div>
       </div>
     </div>
     <style>
       @keyframes gateIn { from { opacity:0; transform:translateY(20px) scale(0.97); } to { opacity:1; transform:translateY(0) scale(1); } }
     </style>`;
   document.body.appendChild(gate);
-  setTimeout(() => document.getElementById('gate-input')?.focus(), 100);
+  setTimeout(() => document.getElementById('auth-email')?.focus(), 100);
 }
 
-function submitGate() {
-  const val = document.getElementById('gate-input')?.value || '';
-  if (val === BETA_PASS) {
-    sessionStorage.setItem(GATE_KEY, '1');
-    document.getElementById('beta-gate')?.remove();
-    document.getElementById('app').style.display = '';
-    init();
-  } else {
-    const err = document.getElementById('gate-error');
-    const inp = document.getElementById('gate-input');
-    if (err) err.style.display = 'block';
-    if (inp) { inp.value = ''; inp.focus(); inp.style.borderColor = '#dc2626'; }
-    setTimeout(() => { if (inp) inp.style.borderColor = '#e2e8f0'; }, 1500);
+let authMode = 'login';
+function toggleAuthMode(e) {
+  if (e) e.preventDefault();
+  authMode = authMode === 'login' ? 'signup' : 'login';
+  document.getElementById('auth-title').textContent = authMode === 'login' ? 'Sign In' : 'Create Account';
+  document.getElementById('auth-subtitle').textContent = authMode === 'login' ? 'Enter your email and password to continue.' : 'Create a new account to get started.';
+  document.getElementById('auth-submit-btn').textContent = authMode === 'login' ? 'Sign In' : 'Create Account';
+  document.getElementById('auth-toggle-text').textContent = authMode === 'login' ? "Don't have an account?" : 'Already have an account?';
+  document.getElementById('auth-toggle-link').textContent = authMode === 'login' ? 'Sign Up' : 'Sign In';
+  document.getElementById('auth-error').style.display = 'none';
+  document.getElementById('auth-success').style.display = 'none';
+}
+
+async function submitAuth() {
+  const email = document.getElementById('auth-email')?.value.trim();
+  const password = document.getElementById('auth-password')?.value;
+  const errEl = document.getElementById('auth-error');
+  const successEl = document.getElementById('auth-success');
+  errEl.style.display = 'none';
+  successEl.style.display = 'none';
+
+  if (!email || !password) {
+    errEl.textContent = 'Please enter both email and password.';
+    errEl.style.display = 'block';
+    return;
+  }
+  if (password.length < 6) {
+    errEl.textContent = 'Password must be at least 6 characters.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  const btn = document.getElementById('auth-submit-btn');
+  btn.disabled = true;
+  btn.textContent = authMode === 'login' ? 'Signing in…' : 'Creating account…';
+
+  try {
+    let result;
+    if (authMode === 'signup') {
+      result = await supabase.auth.signUp({ email, password });
+      if (result.error) throw result.error;
+      if (result.data?.user?.identities?.length === 0) {
+        errEl.textContent = 'An account with this email already exists. Try signing in.';
+        errEl.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'Create Account';
+        return;
+      }
+      // Check if email confirmation is required
+      if (result.data?.user && !result.data.session) {
+        successEl.textContent = 'Account created! Check your email to confirm, then sign in.';
+        successEl.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'Create Account';
+        authMode = 'login';
+        toggleAuthMode();
+        return;
+      }
+    } else {
+      result = await supabase.auth.signInWithPassword({ email, password });
+      if (result.error) throw result.error;
+    }
+    // Auth succeeded — session is set, onAuthStateChange will handle the rest
+  } catch(err) {
+    errEl.textContent = err.message || 'Authentication failed. Please try again.';
+    errEl.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = authMode === 'login' ? 'Sign In' : 'Create Account';
   }
 }
 
+async function signOut() {
+  await supabase.auth.signOut();
+  currentUser = null;
+  showAuthScreen();
+}
+
 // ── INIT ──
-function init() {
-  loadState();
+async function init() {
+  loadCompanies();
+  await loadState();
   render();
   initSwitcher();
 }
 
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => {
-    if (checkGate()) { init(); } else { showGate(); }
-  });
-} else {
-  if (checkGate()) { init(); } else { showGate(); }
-}
+// Listen for auth state changes
+supabase.auth.onAuthStateChange(async (event, session) => {
+  if (session?.user) {
+    currentUser = session.user;
+    document.getElementById('auth-gate')?.remove();
+    document.getElementById('app').style.display = '';
+    await init();
+  } else {
+    currentUser = null;
+    showAuthScreen();
+  }
+});
+
+// On page load, check for existing session
+(async () => {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session?.user) {
+    currentUser = session.user;
+    document.getElementById('app').style.display = '';
+    await init();
+  } else {
+    showAuthScreen();
+  }
+})();
 </script>
 </body>
 </html>
