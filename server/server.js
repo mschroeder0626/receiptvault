@@ -65,6 +65,16 @@ app.post('/api/claude', async (req, res) => {
   }
 });
 
+// SPA catch-all: serve index.html for any unmatched GET route
+app.get('*', (req, res) => {
+  const indexPath = path.join(__dirname, 'index.html');
+  if (fs.existsSync(indexPath)) {
+    res.type('html').send(fs.readFileSync(indexPath, 'utf8'));
+  } else {
+    res.status(404).send('index.html not found');
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`ReceiptVault running on port ${PORT}`);
   console.log(`Supabase: ${SUPABASE_URL ? 'configured' : 'NOT configured'}`);
