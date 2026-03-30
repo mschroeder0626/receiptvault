@@ -594,7 +594,7 @@
 // Anon key is a public client key (safe for client-side use — RLS enforces access)
 const SUPABASE_URL = window.__SUPABASE_URL__ || 'https://iargqldhonzpajsfmguv.supabase.co';
 const SUPABASE_ANON_KEY = window.__SUPABASE_ANON_KEY__ || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlhcmdxbGRob256cGFqc2ZtZ3V2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3ODkwODEsImV4cCI6MjA5MDM2NTA4MX0.OQmpfmqZMPuIDZ2c0Udy5biIeL6CsAnRh7zcliEGOVo';
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let currentUser = null;
 
 // ── COMPANY COLORS ──
@@ -627,16 +627,16 @@ async function saveReceipt(receipt) {
   const catId = await getOrCreateCategory(receipt.category);
   if (catId) row.category_id = catId;
 
-  const { data, error } = await supabase.from('rv_receipts').upsert(row, { onConflict: 'id' }).select().single();
+  const { data, error } = await sb.from('rv_receipts').upsert(row, { onConflict: 'id' }).select().single();
   if (error) { console.error('Save receipt error:', error); return null; }
   return data;
 }
 
 async function getOrCreateCategory(name) {
   if (!name || !currentUser) return null;
-  const { data: existing } = await supabase.from('rv_categories').select('id').eq('user_id', currentUser.id).eq('name', name).single();
+  const { data: existing } = await sb.from('rv_categories').select('id').eq('user_id', currentUser.id).eq('name', name).single();
   if (existing) return existing.id;
-  const { data: created } = await supabase.from('rv_categories').insert({ user_id: currentUser.id, name }).select('id').single();
+  const { data: created } = await sb.from('rv_categories').insert({ user_id: currentUser.id, name }).select('id').single();
   return created?.id || null;
 }
 
@@ -686,16 +686,16 @@ async function loadReceipts() {
 }
 
 async function deleteReceiptFromDB(id) {
-  await supabase.from('rv_receipts').delete().eq('id', id);
+  await sb.from('rv_receipts').delete().eq('id', id);
 }
 
 async function uploadReceiptImage(file, receiptId) {
   if (!currentUser) return null;
   const ext = file.name.split('.').pop();
   const path = `${currentUser.id}/${receiptId}.${ext}`;
-  const { error } = await supabase.storage.from('receipt-images').upload(path, file, { upsert: true });
+  const { error } = await sb.storage.from('receipt-images').upload(path, file, { upsert: true });
   if (error) { console.error('Upload error:', error); return null; }
-  const { data } = supabase.storage.from('receipt-images').getPublicUrl(path);
+  const { data } = sb.storage.from('receipt-images').getPublicUrl(path);
   return data?.publicUrl || null;
 }
 
@@ -1831,7 +1831,7 @@ async function submitAuth() {
   try {
     let result;
     if (authMode === 'signup') {
-      result = await supabase.auth.signUp({ email, password });
+      result = await sb.auth.signUp({ email, password });
       if (result.error) throw result.error;
       if (result.data?.user?.identities?.length === 0) {
         errEl.textContent = 'An account with this email already exists. Try signing in.';
@@ -1851,7 +1851,7 @@ async function submitAuth() {
         return;
       }
     } else {
-      result = await supabase.auth.signInWithPassword({ email, password });
+      result = await sb.auth.signInWithPassword({ email, password });
       if (result.error) throw result.error;
     }
     // Auth succeeded — session is set, onAuthStateChange will handle the rest
@@ -1864,7 +1864,7 @@ async function submitAuth() {
 }
 
 async function signOut() {
-  await supabase.auth.signOut();
+  await sb.auth.signOut();
   currentUser = null;
   showAuthScreen();
 }
@@ -1878,7 +1878,7 @@ async function init() {
 }
 
 // Listen for auth state changes
-supabase.auth.onAuthStateChange(async (event, session) => {
+sb.auth.onAuthStateChange(async (event, session) => {
   if (session?.user) {
     currentUser = session.user;
     document.getElementById('auth-gate')?.remove();
@@ -1892,7 +1892,7 @@ supabase.auth.onAuthStateChange(async (event, session) => {
 
 // On page load, check for existing session
 (async () => {
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { session } } = await sb.auth.getSession();
   if (session?.user) {
     currentUser = session.user;
     document.getElementById('app').style.display = '';
