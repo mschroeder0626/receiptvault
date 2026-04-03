@@ -662,7 +662,7 @@ function formatDateFromISO(isoStr) {
 async function loadReceipts() {
   if (!currentUser) return [];
   const query = sb.from('rv_receipts')
-    .select('*, rv_categories(name), rv_businesses(id, name)')
+    .select('*, rv_categories(name), businesses(id, name)')
     .eq('user_id', currentUser.id)
     .order('created_at', { ascending: false });
   // Filter by active business if one is selected
@@ -684,7 +684,7 @@ async function loadReceipts() {
     note: r.notes || '',
     imageUrl: r.image_url || null,
     businessId: r.business_id || null,
-    businessName: r.rv_businesses?.name || null,
+    businessName: r.businesses?.name || null,
     cardLast4: r.ocr_raw?.card_last4 || null,
     cardNetwork: r.ocr_raw?.card_network || null,
     _supabaseId: r.id
@@ -708,7 +708,7 @@ async function uploadReceiptImage(file, receiptId) {
 // ── BUSINESS CRUD (Supabase) ──
 async function loadBusinesses() {
   if (!currentUser) return [];
-  const { data, error } = await sb.from('rv_businesses').select('*').eq('owner_user_id', currentUser.id).order('created_at');
+  const { data, error } = await sb.from('businesses').select('*').eq('owner_user_id', currentUser.id).order('created_at');
   if (error) { console.error('Load businesses error:', error); return []; }
   return data || [];
 }
@@ -716,7 +716,7 @@ async function loadBusinesses() {
 async function createBusiness(name, color) {
   if (!currentUser) return null;
   const isFirst = RV.businesses.length === 0;
-  const { data, error } = await sb.from('rv_businesses').insert({ owner_user_id: currentUser.id, name, color: color || '#1d6fbf', is_default: isFirst }).select().single();
+  const { data, error } = await sb.from('businesses').insert({ owner_user_id: currentUser.id, name, color: color || '#1d6fbf', is_default: isFirst }).select().single();
   if (error) { console.error('Create business error:', error); return null; }
   return data;
 }
@@ -724,23 +724,23 @@ async function createBusiness(name, color) {
 async function setDefaultBusiness(id) {
   if (!currentUser) return;
   // Unset all defaults first
-  await sb.from('rv_businesses').update({ is_default: false }).eq('owner_user_id', currentUser.id);
-  await sb.from('rv_businesses').update({ is_default: true }).eq('id', id);
+  await sb.from('businesses').update({ is_default: false }).eq('owner_user_id', currentUser.id);
+  await sb.from('businesses').update({ is_default: true }).eq('id', id);
 }
 
 // ── CARD MAPPING & AUTO-ROUTING ──
 async function loadCardMappings() {
   if (!currentUser) return [];
-  const { data } = await sb.from('rv_card_mappings').select('*, rv_businesses(id, name)').eq('user_id', currentUser.id);
+  const { data } = await sb.from('rv_card_mappings').select('*, businesses(id, name)').eq('user_id', currentUser.id);
   return data || [];
 }
 
 async function findBusinessByCard(last4, network) {
   if (!currentUser || !last4) return null;
-  let query = sb.from('rv_card_mappings').select('business_id, rv_businesses(id, name)').eq('user_id', currentUser.id).eq('last_four', last4);
+  let query = sb.from('rv_card_mappings').select('business_id, businesses(id, name)').eq('user_id', currentUser.id).eq('last_four', last4);
   if (network) query = query.eq('network', network);
   const { data } = await query.limit(1).single();
-  return data ? { id: data.business_id, name: data.rv_businesses?.name } : null;
+  return data ? { id: data.business_id, name: data.businesses?.name } : null;
 }
 
 async function saveCardMapping(last4, network, businessId, bankName, nickname) {
