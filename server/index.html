@@ -504,13 +504,30 @@
         <div class="logo-mark" style="width:32px;height:32px;font-size:16px;">🧾</div>
         <div class="logo-text" style="font-size:17px;">Receipt<span>Vault</span></div>
       </div>
-      <!-- Company switcher in sidebar -->
+      <!-- Business switcher in sidebar -->
       <div style="padding:10px 12px;border-bottom:1px solid var(--rule);">
         <div class="co-switcher" id="co-switcher-desktop">
           <div class="co-pill" style="width:100%;justify-content:flex-start;" id="co-pill-desktop" onclick="toggleSwitcher(event,'desktop')">
             <div class="co-dot" id="co-dot-desktop"></div>
             <span id="co-name-label-desktop" style="flex:1;">Loading…</span>
             <span class="co-chevron" id="co-chevron-desktop">▼</span>
+          </div>
+          <div class="co-dropdown" id="co-dropdown-desktop">
+            <div class="co-dropdown-label">Your Businesses</div>
+            <div id="co-list-desktop"></div>
+            <div class="co-divider"></div>
+            <div class="co-add-btn" id="co-add-trigger-desktop" onclick="toggleAddForm('desktop')">
+              <span style="font-size:16px;">＋</span> Add Business
+            </div>
+            <div class="co-add-form" id="co-add-form-desktop">
+              <input class="co-add-input" id="co-add-name-desktop" placeholder="Business name" maxlength="40">
+              <div style="font-size:10px;color:var(--ink3);font-weight:600;text-transform:uppercase;letter-spacing:0.06em;">Color tag</div>
+              <div class="co-color-row" id="co-color-row-desktop"></div>
+              <div class="co-add-actions">
+                <button class="co-cancel-btn" onclick="toggleAddForm('desktop')">Cancel</button>
+                <button class="co-save-btn" onclick="addCompany('desktop')">Add Business</button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -551,19 +568,19 @@
         <span class="co-chevron" id="co-chevron">▼</span>
       </div>
       <div class="co-dropdown" id="co-dropdown">
-        <div class="co-dropdown-label">Your Companies</div>
+        <div class="co-dropdown-label">Your Businesses</div>
         <div id="co-list"></div>
         <div class="co-divider"></div>
-        <div class="co-add-btn" id="co-add-trigger" onclick="toggleAddForm()">
-          <span style="font-size:16px;">＋</span> Add Company
+        <div class="co-add-btn" id="co-add-trigger" onclick="toggleAddForm('mobile')">
+          <span style="font-size:16px;">＋</span> Add Business
         </div>
         <div class="co-add-form" id="co-add-form">
-          <input class="co-add-input" id="co-add-name" placeholder="Company name" maxlength="40">
+          <input class="co-add-input" id="co-add-name" placeholder="Business name" maxlength="40">
           <div style="font-size:10px;color:var(--ink3);font-weight:600;text-transform:uppercase;letter-spacing:0.06em;">Color tag</div>
           <div class="co-color-row" id="co-color-row"></div>
           <div class="co-add-actions">
-            <button class="co-cancel-btn" onclick="toggleAddForm()">Cancel</button>
-            <button class="co-save-btn" onclick="addCompany()">Add Company</button>
+            <button class="co-cancel-btn" onclick="toggleAddForm('mobile')">Cancel</button>
+            <button class="co-save-btn" onclick="addCompany('mobile')">Add Business</button>
           </div>
         </div>
       </div>
@@ -840,82 +857,102 @@ function initSwitcher() {
   renderCompanyList();
   renderColorRow();
   document.addEventListener('click', e => {
-    if (!document.getElementById('co-switcher')?.contains(e.target)) closeSwitcher();
+    if (!document.getElementById('co-switcher')?.contains(e.target) &&
+        !document.getElementById('co-switcher-desktop')?.contains(e.target)) closeSwitcher();
   });
 }
 
 function updatePill() {
   const biz = activeBusiness();
-  const dot = document.getElementById('co-dot');
-  const lbl = document.getElementById('co-name-label');
-  if (dot) dot.style.background = biz.color;
-  if (lbl) lbl.textContent = biz.name;
-  const dotD = document.getElementById('co-dot-desktop');
-  const lblD = document.getElementById('co-name-label-desktop');
-  if (dotD) dotD.style.background = biz.color;
-  if (lblD) lblD.textContent = biz.name;
+  ['', '-desktop'].forEach(suffix => {
+    const dot = document.getElementById('co-dot' + suffix);
+    const lbl = document.getElementById('co-name-label' + suffix);
+    if (dot) dot.style.background = biz.color;
+    if (lbl) lbl.textContent = biz.name;
+  });
 }
 
-function renderCompanyList() {
-  const list = document.getElementById('co-list');
-  if (!list) return;
-  // "All Businesses" option
+function buildBusinessListHTML() {
   let html = `<div class="co-item ${!RV.activeBusinessId ? 'active' : ''}" onclick="switchCompany(null)">
     <div class="co-dot" style="background:#94a3b8;width:10px;height:10px;border-radius:50%;flex-shrink:0;"></div>
     <div class="co-item-info"><div class="co-item-name">All Businesses</div></div>
     ${!RV.activeBusinessId ? '<span class="co-item-check">✓</span>' : ''}
   </div>`;
-  html += RV.businesses.map(b => `
-    <div class="co-item ${b.id === RV.activeBusinessId ? 'active' : ''}" onclick="switchCompany('${b.id}')">
+  html += RV.businesses.map(b => {
+    const isActive = b.id === RV.activeBusinessId;
+    return `
+    <div class="co-item ${isActive ? 'active' : ''}" onclick="switchCompany('${b.id}')" style="position:relative;">
       <div class="co-dot" style="background:${b.color};width:10px;height:10px;border-radius:50%;flex-shrink:0;"></div>
-      <div class="co-item-info">
-        <div class="co-item-name">${b.name}${b.is_default ? '<span class=\"co-default-tag\">DEFAULT</span>' : ''}</div>
+      <div class="co-item-info" style="flex:1;min-width:0;">
+        <div class="co-item-name">${b.name}${b.is_default ? '<span class="co-default-tag">DEFAULT</span>' : ''}</div>
       </div>
-      ${b.id === RV.activeBusinessId ? '<span class="co-item-check">✓</span>' : ''}
+      ${isActive ? '<span class="co-item-check">✓</span>' : ''}
+      <span onclick="event.stopPropagation();showBizActions('${b.id}')" style="cursor:pointer;font-size:14px;padding:2px 6px;color:var(--ink3);border-radius:4px;" title="Edit">···</span>
     </div>
-    ${b.id === RV.activeBusinessId && !b.is_default ? `<div class="co-set-default" onclick="rvSetDefaultBiz('${b.id}')">Set as default</div>` : ''}
-  `).join('');
-  list.innerHTML = html;
-  const trigger = document.getElementById('co-add-trigger');
-  if (trigger) trigger.style.display = RV.businesses.length >= 10 ? 'none' : 'flex';
+    ${isActive && !b.is_default ? `<div class="co-set-default" onclick="event.stopPropagation();rvSetDefaultBiz('${b.id}')">Set as default</div>` : ''}`;
+  }).join('');
+  return html;
+}
+
+function renderCompanyList() {
+  const html = buildBusinessListHTML();
+  ['co-list', 'co-list-desktop'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = html;
+  });
+  ['co-add-trigger', 'co-add-trigger-desktop'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = RV.businesses.length >= 10 ? 'none' : 'flex';
+  });
 }
 
 function renderColorRow() {
-  const row = document.getElementById('co-color-row');
-  if (!row) return;
-  row.innerHTML = CO_COLORS.map(c =>
-    `<div class="co-color-swatch ${c === selectedColor ? 'selected' : ''}" style="background:${c};" onclick="selectColor('${c}',this)"></div>`
-  ).join('');
+  ['co-color-row', 'co-color-row-desktop'].forEach(id => {
+    const row = document.getElementById(id);
+    if (!row) return;
+    row.innerHTML = CO_COLORS.map(c =>
+      `<div class="co-color-swatch ${c === selectedColor ? 'selected' : ''}" style="background:${c};" onclick="selectColor('${c}')"></div>`
+    ).join('');
+  });
 }
 
-function selectColor(color, el) {
+function selectColor(color) {
   selectedColor = color;
-  document.querySelectorAll('.co-color-swatch').forEach(s => s.classList.remove('selected'));
-  el.classList.add('selected');
+  document.querySelectorAll('.co-color-swatch').forEach(s => {
+    s.classList.toggle('selected', s.style.background === color);
+  });
 }
 
-function toggleSwitcher(e) {
+function toggleSwitcher(e, variant) {
   e.stopPropagation();
   RV.switcherOpen = !RV.switcherOpen;
-  document.getElementById('co-dropdown').classList.toggle('open', RV.switcherOpen);
-  document.getElementById('co-chevron').classList.toggle('open', RV.switcherOpen);
-  if (RV.switcherOpen) renderCompanyList();
+  const suffix = variant === 'desktop' ? '-desktop' : '';
+  // Close the other panel
+  const otherSuffix = suffix === '-desktop' ? '' : '-desktop';
+  const otherDD = document.getElementById('co-dropdown' + otherSuffix);
+  if (otherDD) otherDD.classList.remove('open');
+  const dd = document.getElementById('co-dropdown' + suffix);
+  const ch = document.getElementById('co-chevron' + suffix);
+  if (dd) dd.classList.toggle('open', RV.switcherOpen);
+  if (ch) ch.classList.toggle('open', RV.switcherOpen);
+  if (RV.switcherOpen) { renderCompanyList(); renderColorRow(); }
 }
 
 function closeSwitcher() {
   RV.switcherOpen = false;
   RV.addFormOpen = false;
-  const dd = document.getElementById('co-dropdown');
-  const ch = document.getElementById('co-chevron');
-  const af = document.getElementById('co-add-form');
-  if (dd) dd.classList.remove('open');
-  if (ch) ch.classList.remove('open');
-  if (af) af.classList.remove('open');
+  ['', '-desktop'].forEach(suffix => {
+    const dd = document.getElementById('co-dropdown' + suffix);
+    const ch = document.getElementById('co-chevron' + suffix);
+    const af = document.getElementById('co-add-form' + suffix);
+    if (dd) dd.classList.remove('open');
+    if (ch) ch.classList.remove('open');
+    if (af) af.classList.remove('open');
+  });
 }
 
 async function switchCompany(id) {
   RV.activeBusinessId = id;
-  RV.emailOpen = false;
   closeSwitcher();
   updatePill();
   await loadState();
@@ -924,29 +961,102 @@ async function switchCompany(id) {
 
 async function rvSetDefaultBiz(id) {
   await setDefaultBusiness(id);
-  RV.businesses.forEach(b => b.is_default = b.id === id);
+  RV.businesses.forEach(b => b.is_default = (b.id === id));
   renderCompanyList();
 }
 
-function toggleAddForm() {
+function toggleAddForm(variant) {
   RV.addFormOpen = !RV.addFormOpen;
-  const form = document.getElementById('co-add-form');
+  const suffix = variant === 'desktop' ? '-desktop' : '';
+  const form = document.getElementById('co-add-form' + suffix);
   if (form) form.classList.toggle('open', RV.addFormOpen);
   if (RV.addFormOpen) {
-    document.getElementById('co-add-name')?.focus();
+    document.getElementById('co-add-name' + suffix)?.focus();
     renderColorRow();
   }
 }
 
-async function addCompany() {
-  const name = document.getElementById('co-add-name')?.value.trim();
-  if (!name) { document.getElementById('co-add-name')?.focus(); return; }
+async function addCompany(variant) {
+  const suffix = variant === 'desktop' ? '-desktop' : '';
+  const input = document.getElementById('co-add-name' + suffix);
+  const name = input?.value.trim();
+  if (!name) { input?.focus(); return; }
   if (RV.businesses.length >= 10) return;
   const biz = await createBusiness(name, selectedColor);
   if (!biz) return;
   RV.businesses.push(biz);
   RV.activeBusinessId = biz.id;
   selectedColor = CO_COLORS[RV.businesses.length % CO_COLORS.length];
+  if (input) input.value = '';
+  closeSwitcher();
+  updatePill();
+  await loadState();
+  render();
+}
+
+// ── BUSINESS ACTIONS (rename, delete) ──
+function showBizActions(bizId) {
+  const biz = RV.businesses.find(b => b.id === bizId);
+  if (!biz) return;
+  const overlay = document.createElement('div');
+  overlay.id = 'biz-actions-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,25,35,0.5);z-index:300;display:flex;align-items:flex-end;justify-content:center;padding:20px;animation:fadeIn 0.2s ease;';
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:20px 20px 16px 16px;width:100%;max-width:400px;padding:24px;box-shadow:0 16px 40px rgba(0,0,0,0.3);animation:slideUp 0.25s cubic-bezier(0.16,1,0.3,1);">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;">
+        <div style="width:12px;height:12px;border-radius:50%;background:${biz.color};"></div>
+        <div style="font-size:16px;font-weight:700;color:var(--ink);">Edit Business</div>
+      </div>
+      <div style="margin-bottom:14px;">
+        <label style="display:block;font-size:11px;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:6px;">Business Name</label>
+        <input id="biz-edit-name" value="${biz.name.replace(/"/g,'&quot;')}" maxlength="40"
+          style="width:100%;padding:11px 13px;border:1.5px solid var(--rule);border-radius:9px;font-size:14px;color:var(--ink);background:var(--paper2);font-family:'DM Sans',sans-serif;outline:none;"
+          onfocus="this.style.borderColor='var(--blue)'" onblur="this.style.borderColor='var(--rule)'">
+      </div>
+      <div style="margin-bottom:18px;">
+        <label style="display:block;font-size:11px;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:6px;">Color</label>
+        <div style="display:flex;gap:6px;" id="biz-edit-colors">
+          ${CO_COLORS.map(c => `<div class="co-color-swatch ${c === biz.color ? 'selected' : ''}" style="background:${c};" onclick="document.querySelectorAll('#biz-edit-colors .co-color-swatch').forEach(s=>s.classList.remove('selected'));this.classList.add('selected');"></div>`).join('')}
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        ${RV.businesses.length > 1 ? `<button onclick="rvDeleteBusiness('${biz.id}')" style="padding:11px 14px;border-radius:9px;border:1px solid #fecaca;background:#fef2f2;color:var(--red);font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;">Delete</button>` : ''}
+        <button onclick="document.getElementById('biz-actions-overlay').remove()" style="flex:1;padding:11px;border-radius:9px;border:1px solid var(--rule);background:var(--paper2);color:var(--ink3);font-size:13px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;">Cancel</button>
+        <button onclick="rvSaveBusiness('${biz.id}')" style="flex:2;padding:11px;border-radius:9px;border:none;background:var(--blue);color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;">Save</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  setTimeout(() => document.getElementById('biz-edit-name')?.select(), 100);
+}
+
+async function rvSaveBusiness(bizId) {
+  const name = document.getElementById('biz-edit-name')?.value.trim();
+  if (!name) return;
+  const selectedSwatch = document.querySelector('#biz-edit-colors .co-color-swatch.selected');
+  const color = selectedSwatch?.style.background || '#1d6fbf';
+  const { error } = await sb.from('businesses').update({ name, color }).eq('id', bizId);
+  if (error) { console.error('Update business error:', error); return; }
+  const biz = RV.businesses.find(b => b.id === bizId);
+  if (biz) { biz.name = name; biz.color = color; }
+  document.getElementById('biz-actions-overlay')?.remove();
+  updatePill();
+  renderCompanyList();
+  renderSidebarReceipts();
+}
+
+async function rvDeleteBusiness(bizId) {
+  if (RV.businesses.length <= 1) return;
+  const biz = RV.businesses.find(b => b.id === bizId);
+  if (!confirm(`Delete "${biz?.name}"? Receipts will be unassigned, not deleted.`)) return;
+  const { error } = await sb.from('businesses').delete().eq('id', bizId);
+  if (error) { console.error('Delete business error:', error); return; }
+  RV.businesses = RV.businesses.filter(b => b.id !== bizId);
+  if (RV.activeBusinessId === bizId) {
+    const def = RV.businesses.find(b => b.is_default) || RV.businesses[0];
+    RV.activeBusinessId = def?.id || null;
+  }
+  document.getElementById('biz-actions-overlay')?.remove();
   closeSwitcher();
   updatePill();
   await loadState();
