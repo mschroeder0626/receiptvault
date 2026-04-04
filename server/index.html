@@ -1992,9 +1992,8 @@ async function init() {
   }
 }
 
-// Listen for auth state changes
+// Single auth entry point — onAuthStateChange handles everything including initial session
 sb.auth.onAuthStateChange(async (event, session) => {
-  if (event === 'INITIAL_SESSION') return; // handled by getSession below
   if (session?.user) {
     currentUser = session.user;
     document.getElementById('auth-gate')?.remove();
@@ -2005,18 +2004,6 @@ sb.auth.onAuthStateChange(async (event, session) => {
     showAuthScreen();
   }
 });
-
-// On page load, check for existing session
-(async () => {
-  const { data: { session } } = await sb.auth.getSession();
-  if (session?.user) {
-    currentUser = session.user;
-    document.getElementById('app').style.display = '';
-    await init();
-  } else {
-    showAuthScreen();
-  }
-})();
 </script>
 </body>
 </html>
