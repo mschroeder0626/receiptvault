@@ -594,6 +594,10 @@
 // Anon key is a public client key (safe for client-side use — RLS enforces access)
 const SUPABASE_URL = window.__SUPABASE_URL__ || 'https://iargqldhonzpajsfmguv.supabase.co';
 const SUPABASE_ANON_KEY = window.__SUPABASE_ANON_KEY__ || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlhcmdxbGRob256cGFqc2ZtZ3V2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3ODkwODEsImV4cCI6MjA5MDM2NTA4MX0.OQmpfmqZMPuIDZ2c0Udy5biIeL6CsAnRh7zcliEGOVo';
+if (!window.supabase?.createClient) {
+  document.body.innerHTML = '<div style="padding:40px;text-align:center;font-family:sans-serif;"><h2>Failed to load Supabase</h2><p>The Supabase library could not be loaded. Check your browser extensions (ad blockers) or network connection.</p><button onclick="location.reload()" style="margin-top:16px;padding:10px 24px;font-size:14px;cursor:pointer;">Retry</button></div>';
+  throw new Error('Supabase CDN script not loaded');
+}
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let currentUser = null;
 
@@ -1961,23 +1965,36 @@ async function signOut() {
 }
 
 // ── INIT ──
+let initRunning = false;
 async function init() {
-  await loadState();
-  // Auto-create default business if user has none
-  if (RV.businesses.length === 0) {
-    const biz = await createBusiness('My Business', '#1d6fbf');
-    if (biz) {
-      RV.businesses.push(biz);
-      RV.activeBusinessId = biz.id;
-      await loadState();
+  if (initRunning) return;
+  initRunning = true;
+  try {
+    await loadState();
+    // Auto-create default business if user has none
+    if (RV.businesses.length === 0) {
+      const biz = await createBusiness('My Business', '#1d6fbf');
+      if (biz) {
+        RV.businesses.push(biz);
+        RV.activeBusinessId = biz.id;
+        await loadState();
+      }
     }
+    render();
+    initSwitcher();
+  } catch (e) {
+    console.error('Init error:', e);
+    // Still try to render what we can
+    render();
+    initSwitcher();
+  } finally {
+    initRunning = false;
   }
-  render();
-  initSwitcher();
 }
 
 // Listen for auth state changes
 sb.auth.onAuthStateChange(async (event, session) => {
+  if (event === 'INITIAL_SESSION') return; // handled by getSession below
   if (session?.user) {
     currentUser = session.user;
     document.getElementById('auth-gate')?.remove();
